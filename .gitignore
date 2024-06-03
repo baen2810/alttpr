@@ -1,0 +1,6 @@
+# venv
+venv/
+# Logfiles
+logs/
+scripts/
+.ipynb_checkpoints/
