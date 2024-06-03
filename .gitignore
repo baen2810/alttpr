@@ -3,4 +3,6 @@ venv/
 # Logfiles
 logs/
 scripts/
+export/
+__pycache__/
 .ipynb_checkpoints/
