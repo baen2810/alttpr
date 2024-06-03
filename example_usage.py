@@ -20,6 +20,7 @@ def main():
     loaded_gg = RacetimeCrawler.load("export/racetime_crawler.pkl")
     print(f'Loaded Crawler host_ids: {loaded_gg.host_ids}')  # Output: ['XzVwZWqJmkB5k8eb', 'jb8GPMWwXbB1nEk0']
     print(f'Loaded Crawler host_df.shape: {loaded_gg.hosts_df.shape}')  # Output: DataFrame with combined hosts data
+    print(f'Loaded Crawler len(self.race_ids): {len(loaded_gg.race_ids)}')  # Output: DataFrame with combined hosts data
     print(f'Loaded Crawler Last updated: {to_tstr(loaded_gg.last_updated)}')
 
 if __name__ == "__main__":

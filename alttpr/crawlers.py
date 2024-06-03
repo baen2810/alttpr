@@ -37,6 +37,8 @@ from typing import Any
 from warnings import warn
 from typing import List, Union
 from pathlib import Path
+from tqdm import trange
+from alttpr.utils import pprint
 
 # import base64
 # import io
@@ -66,12 +68,18 @@ class UnsupportedFormatError(RacetimeCrawlerException):
 class RacetimeCrawler:
     def __init__(self) -> None:
         self.host_ids: List[str] = []
+        self.race_ids: List[str] = []
         self.hosts_df: pd.DataFrame = pd.DataFrame()
         self.output_path: Path = Path(os.getcwd(), 'export')
         self.base_url: str = r"https://racetime.gg/user/"
         self.last_updated: pd.Timestamp = pd.Timestamp.now()
 
     def get(self, host_ids: Union[str, List[str]]) -> None:
+        self._get_hosts(host_ids)
+        self._get_races()
+        self.last_updated = pd.Timestamp.now()
+    
+    def _get_hosts(self, host_ids: Union[str, List[str]]) -> None:
         self.host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
         all_hosts_data = []
         for host_id in self.host_ids:
@@ -88,9 +96,29 @@ class RacetimeCrawler:
                 df_user_stats = pd.concat([df_user, df_user_stats], axis=1)
                 all_hosts_data.append(df_user_stats)
             else:
-                raise ValueError(f'unable to process host_id \'{host_id}\'')
+                raise ParseError(f'unable to process host_id \'{host_id}\'')
         self.hosts_df = pd.concat(all_hosts_data, ignore_index=True)
-        self.last_updated = pd.Timestamp.now()  # Update the last_updated attribute
+
+    def _get_races(self, n_pages: int = None) -> None:
+        for i, row in self.hosts_df.iterrows():
+            if n_pages is None:
+                n_pages = row.n_pages
+            for p in trange(n_pages, desc=f'Extracting races from host \'{row.host_name}\''):
+                url = self.base_url + row.host_id + f'?page={p+1}'
+                response = self._scrape(url)
+                psoup = BeautifulSoup(response.content, "html.parser")
+                page_races_lst = psoup.find("div", {"class": "user-races race-list"}).find_all('ol')[0].find_all('li', recursive=False)
+                page_races_lst = [r.find("span", {"class": "slug"}).text for r in page_races_lst]
+                self.race_ids = list(sorted(set(self.race_ids + page_races_lst)))
+        pprint(f'Collected {len(self.race_ids)} races from {i+1} hosts.')
+    
+    def add_races(self, tbd):
+        '''Add one or more races and pull data'''
+        pass
+
+    def update(self, tbd):
+        '''Update populated crawler by adding new races'''
+        pass
 
     def _scrape(self, url: str) -> requests.Response:
         return requests.get(url)
