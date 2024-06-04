@@ -17,6 +17,7 @@ import os
 import pickle
 import zipfile
 import pandas as pd
+import re
 
 
 def get_enum_str(lst, conjunction='und', separator=', '):
@@ -1052,5 +1053,15 @@ def unzip(src, tgt):
     pmakedir(tgt)
     with zipfile.ZipFile(src, 'r') as zip_ref:
         zip_ref.extractall(tgt)
+
+
+def clean_race_info_str(text):
+    # Remove links
+    text = re.sub(r'http\S+', '', text)
+    # Remove content within parentheses with exactly four '/'
+    text = re.sub(r'\([^()]*\/[^()]*\/[^()]*\/[^()]*\/[^()]*\)', '', text)
+    text = text.replace(' -', '').strip()
+    text = text.lower().replace('_', '').replace(' ', '')
+    return text
 
 print('done.')
