@@ -37,21 +37,23 @@ from typing import Any
 from warnings import warn
 from typing import List, Union
 from pathlib import Path
-from tqdm import trange
-from alttpr.utils import pprint
+from tqdm import trange, tqdm
+from alttpr.utils import pprint, get_list
 
 # import base64
 # import io
 # import re
 # import struct
 import os
+import numpy as np
 import pandas as pd
 import requests
 import pickle
 
 
-DEBUG = bool(os.environ.get('ALTTPR_DEBUG'))  # some of the crawlers can print debug info
-
+DEBUG = True  # bool(os.environ.get('ALTTPR_DEBUG'))  # some of the crawlers can print debug info
+pprint('DEBUG mode active') if DEBUG else None
+NAN_VALUE = np.nan
 
 class RacetimeCrawlerException(Exception):
     """Base class for exceptions."""
@@ -67,26 +69,29 @@ class UnsupportedFormatError(RacetimeCrawlerException):
 
 class RacetimeCrawler:
     def __init__(self) -> None:
+        self.game_filter: str = 'alttpr'
         self.host_ids: List[str] = []
         self.race_ids: List[str] = []
         self.hosts_df: pd.DataFrame = pd.DataFrame()
+        self.races_df: pd.DataFrame = pd.DataFrame()
         self.output_path: Path = Path(os.getcwd(), 'export')
-        self.base_url: str = r"https://racetime.gg/user/"
+        self.base_url: str = r"https://racetime.gg/"
         self.last_updated: pd.Timestamp = pd.Timestamp.now()
 
     def get(self, host_ids: Union[str, List[str]]) -> None:
         self._get_hosts(host_ids)
-        self._get_races()
+        self._get_race_ids(n_pages=2 if DEBUG else None)
+        self._get_racerooms()
         self.last_updated = pd.Timestamp.now()
     
     def _get_hosts(self, host_ids: Union[str, List[str]]) -> None:
         self.host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
         all_hosts_data = []
         for host_id in self.host_ids:
-            url = self.base_url + host_id
+            url = self.base_url + 'user/' + host_id
             response = self._scrape(url)
-            soup = BeautifulSoup(response.content, 'html.parser')
             if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
                 n_pages = int(soup.find("div", {"class": "pagination"}).decode_contents().strip().split(' of ')[1].split('\n')[0])
                 host_name = soup.find("div", {"class": "user-profile"}).find("span", {"class": "name"}).text
                 cols = [v.text.lower().replace(' ', '_') for v in soup.find('aside').find_all('dt')[1:]]
@@ -99,19 +104,82 @@ class RacetimeCrawler:
                 raise ParseError(f'unable to process host_id \'{host_id}\'')
         self.hosts_df = pd.concat(all_hosts_data, ignore_index=True)
 
-    def _get_races(self, n_pages: int = None) -> None:
+    def _get_race_ids(self, n_pages: int = None) -> None:
         for i, row in self.hosts_df.iterrows():
             if n_pages is None:
                 n_pages = row.n_pages
             for p in trange(n_pages, desc=f'Extracting races from host \'{row.host_name}\''):
-                url = self.base_url + row.host_id + f'?page={p+1}'
+                url = self.base_url + 'user/' + row.host_id + f'?page={p+1}'
                 response = self._scrape(url)
-                psoup = BeautifulSoup(response.content, "html.parser")
-                page_races_lst = psoup.find("div", {"class": "user-races race-list"}).find_all('ol')[0].find_all('li', recursive=False)
-                page_races_lst = [r.find("span", {"class": "slug"}).text for r in page_races_lst]
-                self.race_ids = list(sorted(set(self.race_ids + page_races_lst)))
+                if response.status_code == 200:
+                    psoup = BeautifulSoup(response.content, "html.parser")
+                    page_races_lst = psoup.find("div", {"class": "user-races race-list"}).find_all('ol')[0].find_all('li', recursive=False)
+                    page_races_lst = [r.find("span", {"class": "slug"}).text for r in page_races_lst]
+                    self.race_ids = list(sorted(set(self.race_ids + page_races_lst)))
+                else:
+                    raise ParseError(f'unable to process page \'{url}\'')
         pprint(f'Collected {len(self.race_ids)} races from {i+1} hosts.')
     
+    def _get_racerooms(self):
+        self.races_df = pd.concat([self._get_raceroom(r) for r in tqdm(self.race_ids, desc='Parsing races')], ignore_index=True)            
+    
+    def _get_raceroom(self, url: str) -> pd.DataFrame:
+        response = self._scrape(self.base_url + self.game_filter + '/' + url)
+        if response.status_code == 200:
+            rsoup = BeautifulSoup(response.content, "html.parser")
+            rsoup_info = rsoup.find('div', {"class": "race-intro"})
+            try:
+                rr_permalink = rsoup_info.find('a', {"rel": "nofollow"}).text
+            except Exception as e:
+                rr_permalink = NAN_VALUE
+            try:
+                rr_info = rsoup_info.find('span', {"class": "info"}).text
+            except Exception as e:
+                rr_info = NAN_VALUE
+            entrants_lst = rsoup.find('div', {"class": "race-entrants"}).find_all('li', {"class": "entrant-row"})
+            race_goal = rsoup.find('span', {'class': 'goal'}).text.strip()
+            race_state = rsoup.find('div', {'class': 'state'}).find('span', {'class': 'value'}).text
+            race_start = pd.to_datetime(rsoup.find('time', {'class': 'timer'})['datetime'])
+            race_n_entrants = int(rsoup.find('div', {'class': 'count'}).text.strip().split(' entrants')[0])
+            df_races = pd.DataFrame()
+            for e in entrants_lst:
+                try:
+                    href_user = e.find('a', {"class": "user-pop inline"})['href']
+                except:
+                    href_user = e.find('a', {"class": "user-pop inline supporter"})['href']
+                entrant_rank = int(e.find('span', {"class": "place"}).text.strip().replace('th', '').replace('rd', '').replace('nd', '').replace('st', '').replace('—', '10_000'))
+                entrant_finishtime = e.find('time', {"class": "finish-time"}).text
+                entrant_finishtime = NAN_VALUE if entrant_finishtime=='None' else entrant_finishtime
+                df_races = pd.concat([df_races, pd.DataFrame({
+                    'race_href': [url],
+                    'race_goal': [race_goal],
+                    'race_permalink': [rr_permalink],
+                    'race_info': [rr_info],
+                    'race_href': [url],
+                    'race_goal': [race_goal],
+                    'race_state': [race_state],
+                    'race_start': [race_start],
+                    'race_timer': [rsoup.find('time', {'class': 'timer'}).text.strip()[:-2]],
+                    'race_n_entrants': [race_n_entrants],
+                    'entrant_place': [e.find('span', {"class": "place"}).text.strip()],
+                    'entrant_rank': [entrant_rank],
+                    'entrant_name': [e.find('span', {"class": "name"}).text],
+                    'entrant_href': [href_user],
+                    'entrant_finishtime': [entrant_finishtime],
+                })], ignore_index=True)
+            df_races.race_start = df_races.race_start.dt.tz_localize(None)
+            df_races.race_n_entrants = pd.to_numeric(df_races.race_n_entrants)
+            df_races.race_goal = df_races.race_goal.str.replace('\n', '')
+            df_races.race_state = df_races.race_state.str.replace('\n', '')
+            df_races.entrant_href = df_races.entrant_href.str.replace('/user/', '')
+            df_races['race_timer_sec'] = [int(r.split(':')[0])*60*60 + int(r.split(':')[1])*60 + int(r.split(':')[2]) for r in df_races.race_timer]
+            df_races.sort_values(['entrant_rank'], ascending=True).reset_index(drop=True)
+            # df_races.entrant_finishtime = get_list(df_races.entrant_finishtime)
+            df_races['is_game'] = [1 if self.game_filter in r.lower() else 0 for r in df_races.race_goal]
+            return df_races
+        else:
+            raise ParseError(f'unable to process race_id \'{url}\'')
+
     def add_races(self, tbd):
         '''Add one or more races and pull data'''
         pass
