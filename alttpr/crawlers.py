@@ -88,11 +88,11 @@ class RacetimeCrawler:
         self.community_race_thres = 5
         self.weekday_dict_DE = {'0': 'Montag', '1': 'Dienstag', '2': 'Mittwoch', '3': 'Donnerstag', '4': 'Freitag', '5': 'Samstag', '6': 'Sonntag'}
 
-    def get(self, host_ids: Union[str, List[str]]) -> None:
+    def get(self, host_ids: Union[str, List[str]], n_pages: int = None) -> None:
         self._get_hosts(host_ids)
-        self._get_race_ids(n_pages=2 if DEBUG else None)
+        self._get_race_ids(n_pages=n_pages if DEBUG else None)
         self._get_races_data()
-        self.last_updated = pd.Timestamp.now()
+        assert len(self._list_ids_in_races_df()) == len(self.race_ids), f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})'
     
     def _get_hosts(self, host_ids: Union[str, List[str]]) -> None:
         self.host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
@@ -113,12 +113,12 @@ class RacetimeCrawler:
             else:
                 raise ParseError(f'unable to process host_id \'{host_id}\'')
         self.hosts_df = pd.concat(all_hosts_data, ignore_index=True)
+        self.last_updated = pd.Timestamp.now()
 
     def _get_race_ids(self, n_pages: int = None) -> None:
         for i, row in self.hosts_df.iterrows():
-            if n_pages is None:
-                n_pages = row.n_pages
-            for p in trange(n_pages, desc=f'Extracting races from host \'{row.host_name}\''):
+            host_n_pages = row.n_pages if n_pages is None else n_pages                
+            for p in trange(host_n_pages, desc=f'Extracting races from host \'{row.host_name}\''):
                 url = self.base_url + '/user/' + row.host_id + f'?page={p+1}'
                 response = self._scrape(url)
                 if response.status_code == 200:
@@ -129,14 +129,24 @@ class RacetimeCrawler:
                     self.race_ids = list(sorted(set(self.race_ids + page_races_lst)))
                 else:
                     raise ParseError(f'unable to process page \'{url}\'')
-        pprint(f'Collected {len(self.race_ids)} races from {i+1} hosts.')
+        self.last_updated = pd.Timestamp.now()
+        pprint(f'Collected {len(self.race_ids)} race ids from {i+1} hosts.')
     
     def _get_races_data(self):
-        new_race_ids = [i for i in self.race_ids if i not in list(sorted(set(self.races_df.race_href)))]  # /alttpr/banzai-redboom-2002
-        # new_race_ids = [i for i in self.race_ids if i not in ['/alttpr/banzai-redboom-2002']]  # 
-        new_races_df = pd.concat([self._get_race_data(r) for r in tqdm(new_race_ids, desc='Parsing races')], ignore_index=True)
-        self.races_df = pd.concat([self.races_df, new_races_df], ignore_index=True).sort_values(['race_start', 'entrant_place'])
-    
+        race_ids_to_crawl = [i for i in self.race_ids if i not in self._list_ids_in_races_df()]  # /alttpr/banzai-redboom-2002
+        race_ids_already_crawled = [i for i in self.race_ids if i in self._list_ids_in_races_df()]
+        pprint(f'{len(race_ids_already_crawled)} already parsed.')
+        pprint(f'Parsing {len(race_ids_to_crawl)} new races.')
+        if len(race_ids_to_crawl) > 0:
+            new_races_df = pd.concat([self._get_race_data(r) for r in tqdm(race_ids_to_crawl, desc='Parsing races')], ignore_index=True)
+            self.races_df = pd.concat([self.races_df, new_races_df], ignore_index=True).sort_values(['race_start', 'entrant_place'], ascending=[False, True])
+        else:
+            pprint('No new races detected. Crawler is up to date.')
+        self.last_updated = pd.Timestamp.now()
+
+    def _list_ids_in_races_df(self):
+        return list(sorted(set(self.races_df.race_href)))
+
     def _get_race_data(self, url: str) -> pd.DataFrame:
         race_url = self.base_url + url
         response = self._scrape(race_url)
@@ -204,6 +214,7 @@ class RacetimeCrawler:
             return df_races
         else:
             pprint(f'unable to process race_id \'{race_url}\'')
+        self.last_updated = pd.Timestamp.now()
 
     def _parse_race_info(self, df_rr_details: pd.DataFrame):
         df_rr_details['mode_open'] = [1 if 'open' in r.lower() else 0 for r in df_rr_details.race_info_norm]
@@ -345,6 +356,7 @@ class RacetimeCrawler:
         df_rr_details['race_tournament'] = tournament_lst
         # df_races = df_races_tmp.set_index('race_href').join(df_rr_details[['race_href', 'rr_permalink', 'rr_info', 'race_tournament', 'race_mode', 'race_mode_simple', 'mode_boots']].set_index('race_href')).reset_index()
         df_rr_details.race_tournament = ['Community Race' if e >= self.community_race_thres and type(t) == float else t for e,t in zip(df_rr_details.race_n_entrants, df_rr_details.race_tournament)]
+        self.last_updated = pd.Timestamp.now()
         return df_rr_details
 
     def add_races(self, tbd):
@@ -383,4 +395,5 @@ class RacetimeCrawler:
         with open(path, 'rb') as f:
             crawler = pickle.load(f)
         print(f'Crawler object loaded from: {path}')
+        assert len(crawler._list_ids_in_races_df()) == len(crawler.race_ids), f'Number of race ids in races_df ({len(crawler._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(crawler.race_ids)})'
         return crawler
