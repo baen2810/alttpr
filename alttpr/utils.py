@@ -20,6 +20,13 @@ import pandas as pd
 import re
 
 
+def pprintdesc(desc, tgt_len=26):
+    if len(desc) <= tgt_len:
+        while len(desc) < tgt_len - 1:
+            desc += ' '
+    return desc
+
+
 def get_enum_str(lst, conjunction='und', separator=', '):
     conjunction = conjunction.strip()
     if len(lst) == 0:

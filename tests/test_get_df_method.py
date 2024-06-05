@@ -1,18 +1,23 @@
 import sys
 import os
 
+# Add the directory containing the alttpr module to sys.path
+module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
+from pathlib import Path
 from alttpr.crawlers import RacetimeCrawler
 from alttpr.utils import to_tstr, pprint
-from pathlib import Path
+
 
 def main():
-    # Load the crawler object
-    gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'tests', 'data', 'racetime_crawler_30_races.pkl')))
-    pprint(f'Loaded Crawler host_ids: {gg.host_ids}')  # Output: ['XzVwZWqJmkB5k8eb', 'jb8GPMWwXbB1nEk0']
-    pprint(f'Loaded Crawler host_df.shape: {gg.hosts_df.shape}')  # Output: DataFrame with combined hosts data
-    pprint(f'Loaded Crawler len(self.race_ids): {len(gg.race_ids)}')  # Output: DataFrame with combined hosts data
-    pprint(f'Loaded Crawler Last updated: {to_tstr(gg.last_updated)}')
-
+    # Load crawler object with 30 races
+    test_name = os.path.split(__file__)[-1].replace('.py', '()')
+    pprint(f'----- Starting test \'{test_name}\'', start='\n')
+    pprint('Loading test data')
+    gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'data', 'racetime_crawler_30_races.pkl')))
+    pprint('Testing', end='...')
     df = gg.get_df()
     assert df.shape == (509, 20), 'Param \'host_ids\', Test 1 failed'
     df = gg.get_df(host_ids='XzVwZWqJmkB5k8eb')
@@ -28,7 +33,7 @@ def main():
     df = gg.get_df(host_rows_only=True)
     assert df.shape == (44, 20), 'Param \'host_rows_only\', Test 1 failed'
 
-    pprint('Finished. All tests successfully passed')
+    pprint('All tests successfully passed.', start='done.\n')
 
 if __name__ == "__main__":
     main()

@@ -38,7 +38,7 @@ from warnings import warn
 from typing import List, Union
 from pathlib import Path
 from tqdm import trange, tqdm
-from alttpr.utils import pprint, get_list, clean_race_info_str
+from alttpr.utils import pprint, pprintdesc, get_list, clean_race_info_str
 
 # import base64
 # import io
@@ -57,6 +57,7 @@ pprint('DEBUG mode active') if DEBUG else None
 NAN_VALUE = np.nan
 if DEBUG:
     warnings.simplefilter(action='ignore', category=UserWarning)
+    warnings.simplefilter(action='ignore', category=FutureWarning)
 class RacetimeCrawlerException(Exception):
     """Base class for exceptions."""
 
@@ -76,10 +77,10 @@ class RacetimeCrawler:
         self.race_ids: List[str] = []
         self.hosts_df: pd.DataFrame = pd.DataFrame()
         self.races_df_cols = [
-            'race_href', 'race_goal', 'race_permalink', 'race_info', 'race_state',
-            'race_start', 'race_timer', 'race_n_entrants', 'entrant_place', 'entrant_rank', 'race_info_norm',
+            'race_id', 'race_goal', 'race_permalink', 'race_info', 'race_state',
+            'race_start', 'race_timer', 'race_n_entrants', 'race_info_norm',
             'race_timer_sec', 'is_game', 'mode_boots','race_mode', 'race_mode_simple', 'race_tournament',
-            'entrant_name', 'entrant_href', 'entrant_finishtime',
+            'entrant_id', 'entrant_name', 'entrant_place', 'entrant_rank', 'entrant_finishtime',
             ]
         self.races_df: pd.DataFrame = pd.DataFrame(columns=self.races_df_cols)
         self.output_path: Path = Path(os.getcwd(), 'export')
@@ -88,12 +89,23 @@ class RacetimeCrawler:
         self.community_race_thres = 5
         self.weekday_dict_DE = {'0': 'Montag', '1': 'Dienstag', '2': 'Mittwoch', '3': 'Donnerstag', '4': 'Freitag', '5': 'Samstag', '6': 'Sonntag'}
 
-    def get(self, host_ids: Union[str, List[str]], n_pages: int = None) -> None:
+    def get_df(self, host_ids: Union[str, List[str]] = [], drop_forfeits: bool = False, cols: List[str] = [], host_rows_only=False, rolling_window_days=None):
+        host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
+        host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
+        cols = list(self.races_df_cols) if len(cols) == 0 else cols
+        df = self.races_df[self.races_df.race_id.isin(self.races_df[self.races_df.entrant_id.isin(host_ids)].race_id)]
+        df = df.dropna(subset=['entrant_finishtime']) if drop_forfeits else df
+        df = df[df.entrant_id.isin(host_ids)] if host_rows_only else df
+        df = df[cols]
+        return df
+    
+    def crawl(self, host_ids: Union[str, List[str]], n_pages: int = None) -> None:
         self._get_hosts(host_ids)
         self._get_race_ids(n_pages=n_pages if DEBUG else None)
         self._get_races_data()
-        assert len(self._list_ids_in_races_df()) == len(self.race_ids), f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})'
-    
+        pprint(f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})') if len(self._list_ids_in_races_df()) != len(self.race_ids) else None
+        pprint(f'Number of columns in races_df ({len(self.races_df.columns)}) does not match number of cols in self.races_df_cols ({len(self.races_df_cols)})') if len(self.races_df_cols) != len(self.races_df.columns) else None
+            
     def _get_hosts(self, host_ids: Union[str, List[str]]) -> None:
         self.host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
         all_hosts_data = []
@@ -116,9 +128,10 @@ class RacetimeCrawler:
         self.last_updated = pd.Timestamp.now()
 
     def _get_race_ids(self, n_pages: int = None) -> None:
+        pprint('Finding race ids')
         for i, row in self.hosts_df.iterrows():
             host_n_pages = row.n_pages if n_pages is None else n_pages                
-            for p in trange(host_n_pages, desc=f'Extracting races from host \'{row.host_name}\''):
+            for p in trange(host_n_pages, desc=pprintdesc(f'Host \'{row.host_name}\'')):
                 url = self.base_url + '/user/' + row.host_id + f'?page={p+1}'
                 response = self._scrape(url)
                 if response.status_code == 200:
@@ -135,9 +148,9 @@ class RacetimeCrawler:
     def _get_races_data(self):
         race_ids_to_crawl = [i for i in self.race_ids if i not in self._list_ids_in_races_df()]  # /alttpr/banzai-redboom-2002
         race_ids_already_crawled = [i for i in self.race_ids if i in self._list_ids_in_races_df()]
-        pprint(f'{len(race_ids_already_crawled)} already parsed.')
-        pprint(f'Parsing {len(race_ids_to_crawl)} new races.')
+        pprint(f'{len(race_ids_already_crawled)} races were already parsed.')
         if len(race_ids_to_crawl) > 0:
+            pprint(f'Parsing {len(race_ids_to_crawl)} new races.')
             new_races_df = pd.concat([self._get_race_data(r) for r in tqdm(race_ids_to_crawl, desc='Parsing races')], ignore_index=True)
             self.races_df = pd.concat([self.races_df, new_races_df], ignore_index=True).sort_values(['race_start', 'entrant_place'], ascending=[False, True])
         else:
@@ -145,7 +158,7 @@ class RacetimeCrawler:
         self.last_updated = pd.Timestamp.now()
 
     def _list_ids_in_races_df(self):
-        return list(sorted(set(self.races_df.race_href)))
+        return list(sorted(set(self.races_df.race_id)))
 
     def _get_race_data(self, url: str) -> pd.DataFrame:
         race_url = self.base_url + url
@@ -180,11 +193,10 @@ class RacetimeCrawler:
                 entrant_finishtime = e.find('time', {"class": "finish-time"}).text
                 entrant_finishtime = NAN_VALUE if entrant_finishtime=='None' else entrant_finishtime
                 df_races = pd.concat([df_races, pd.DataFrame({
-                    'race_href': [url],
+                    'race_id': [url],
                     'race_goal': [race_goal],
                     'race_permalink': [rr_permalink],
                     'race_info': [rr_info],
-                    'race_href': [url],
                     'race_goal': [race_goal],
                     'race_state': [race_state],
                     'race_start': [race_start],
@@ -193,14 +205,14 @@ class RacetimeCrawler:
                     'entrant_place': [e.find('span', {"class": "place"}).text.strip()],
                     'entrant_rank': [entrant_rank],
                     'entrant_name': [e.find('span', {"class": "name"}).text],
-                    'entrant_href': [href_user],
+                    'entrant_id': [href_user],
                     'entrant_finishtime': [entrant_finishtime],
                 })], ignore_index=True)
             df_races.race_start = df_races.race_start.dt.tz_localize(None)
             df_races.race_n_entrants = pd.to_numeric(df_races.race_n_entrants)
             df_races.race_goal = df_races.race_goal.str.replace('\n', '')
             df_races.race_state = df_races.race_state.str.replace('\n', '')
-            df_races.entrant_href = df_races.entrant_href.str.replace('/user/', '')
+            df_races.entrant_id = df_races.entrant_id.str.replace('/user/', '')
             df_races.entrant_finishtime = pd.to_datetime(df_races.entrant_finishtime.replace('—', NAN_VALUE))
             df_races.entrant_rank = df_races.entrant_rank.replace(10_000, NAN_VALUE)
             df_races.race_info = df_races.race_info.fillna('')
@@ -354,7 +366,7 @@ class RacetimeCrawler:
             tournament_lst += [tournament]
         # df_rr_details['rr_info_cleansed'] = r_lst
         df_rr_details['race_tournament'] = tournament_lst
-        # df_races = df_races_tmp.set_index('race_href').join(df_rr_details[['race_href', 'rr_permalink', 'rr_info', 'race_tournament', 'race_mode', 'race_mode_simple', 'mode_boots']].set_index('race_href')).reset_index()
+        # df_races = df_races_tmp.set_index('race_id').join(df_rr_details[['race_id', 'rr_permalink', 'rr_info', 'race_tournament', 'race_mode', 'race_mode_simple', 'mode_boots']].set_index('race_id')).reset_index()
         df_rr_details.race_tournament = ['Community Race' if e >= self.community_race_thres and type(t) == float else t for e,t in zip(df_rr_details.race_n_entrants, df_rr_details.race_tournament)]
         self.last_updated = pd.Timestamp.now()
         return df_rr_details
@@ -388,12 +400,13 @@ class RacetimeCrawler:
         save_path = Path(self.output_path, 'racetime_crawler.pkl')
         with open(save_path, 'wb') as f:
             pickle.dump(self, f)
-        print(f'Crawler object saved to: {save_path}')
+        pprint(f'Crawler object saved to: {save_path}')
     
     @staticmethod
     def load(path: Union[Path, str]) -> 'RacetimeCrawler':
         with open(path, 'rb') as f:
             crawler = pickle.load(f)
-        print(f'Crawler object loaded from: {path}')
-        assert len(crawler._list_ids_in_races_df()) == len(crawler.race_ids), f'Number of race ids in races_df ({len(crawler._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(crawler.race_ids)})'
+        pprint(f'Crawler object loaded from: {path}')
+        pprint(f'Number of race ids in races_df ({len(crawler._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(crawler.race_ids)})') if len(crawler._list_ids_in_races_df()) != len(crawler.race_ids) else None
+        pprint(f'Number of columns in races_df ({len(crawler.races_df.columns)}) does not match number of cols in self.races_df_cols ({len(crawler.races_df_cols)})') if len(crawler.races_df_cols) != len(crawler.races_df.columns) else None
         return crawler
