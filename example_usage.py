@@ -1,5 +1,6 @@
 import sys
 import os
+import pandas as pd
 
 from alttpr.crawlers import RacetimeCrawler
 from alttpr.utils import to_tstr, pprint
@@ -12,7 +13,7 @@ def main():
     pprint(f'Loaded Crawler host_df.shape: {gg.hosts_df.shape}')  # Output: DataFrame with combined hosts data
     pprint(f'Loaded Crawler len(self.race_ids): {len(gg.race_ids)}')  # Output: DataFrame with combined hosts data
     pprint(f'Loaded Crawler Last updated: {to_tstr(gg.last_updated)}')
-
+    
     df = gg.get_df()
     assert df.shape == (509, 20), 'Param \'host_ids\', Test 1 failed'
     df = gg.get_df(host_ids='XzVwZWqJmkB5k8eb')
@@ -27,6 +28,10 @@ def main():
     assert df.shape == (509, 2), 'Param \'cols\', Test 1 failed'
     df = gg.get_df(host_rows_only=True)
     assert df.shape == (44, 20), 'Param \'host_rows_only\', Test 1 failed'
+    df = gg.get_df(rolling_window_days=30)
+    assert df.shape == (282, 20), 'Param \'rolling_window_days\', Test 1 failed'
+    df = gg.get_df(windowed=(pd.Timestamp(2024, 5, 1), pd.Timestamp(2024, 5, 30)))
+    assert df.shape == (312, 20), 'Param \'rolling_window_days\', Test 2 failed'
 
     pprint('Finished. All tests successfully passed')
 

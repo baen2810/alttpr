@@ -32,6 +32,7 @@
 # from collections.abc import Callable, Iterator
 # from functools import reduce
 # from sys import stderr
+from datetime import datetime as dt
 from bs4 import BeautifulSoup
 from typing import Any
 from warnings import warn
@@ -89,15 +90,25 @@ class RacetimeCrawler:
         self.community_race_thres = 5
         self.weekday_dict_DE = {'0': 'Montag', '1': 'Dienstag', '2': 'Mittwoch', '3': 'Donnerstag', '4': 'Freitag', '5': 'Samstag', '6': 'Sonntag'}
 
-    def get_df(self, host_ids: Union[str, List[str]] = [], drop_forfeits: bool = False, cols: List[str] = [], host_rows_only=False, rolling_window_days=None):
+    def get_df(self, host_ids: Union[str, List[str]] = [], drop_forfeits: bool = False, cols: List[str] = [],
+               host_rows_only: bool = False, windowed: Union[int, tuple] = None):
         host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
         host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
         cols = list(self.races_df_cols) if len(cols) == 0 else cols
         df = self.races_df[self.races_df.race_id.isin(self.races_df[self.races_df.entrant_id.isin(host_ids)].race_id)]
         df = df.dropna(subset=['entrant_finishtime']) if drop_forfeits else df
         df = df[df.entrant_id.isin(host_ids)] if host_rows_only else df
+        if type(windowed) == int:
+            df = df[df.race_start >= dt.now() - pd.Timedelta(days=windowed)]
+        elif type(windowed) == tuple:
+            min_race_date, max_race_date = windowed
+            df = df[df.race_start >= min_race_date]
+            df = df[df.race_start <= max_race_date]
         df = df[cols]
         return df
+    
+    def get_facts():
+        pass
     
     def crawl(self, host_ids: Union[str, List[str]], n_pages: int = None) -> None:
         self._get_hosts(host_ids)
