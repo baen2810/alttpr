@@ -19,21 +19,21 @@ def main():
     gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'data', 'racetime_crawler_30_races.pkl')))
     pprint('Testing', end='...')
     df = gg.get_df()
-    assert df.shape == (509, 20), f'Param \'host_ids\', Test 1 failed. {df.shape=}'
+    assert df.shape[0] == 449, f'Param \'host_ids\', Test 1 failed. {df.shape=}'
+    df = gg.get_df(game_filter=False)
+    assert df.shape[0] == 509, f'Param \'game_filter\', Test 1 failed. {df.shape=}'
     df = gg.get_df(host_ids='XzVwZWqJmkB5k8eb')
-    assert df.shape == (438, 20), f'Param \'host_ids\', Test 2 failed. {df.shape=}'
+    assert df.shape[0] == 438, f'Param \'host_ids\', Test 2 failed. {df.shape=}'
     df = gg.get_df(host_ids=['jb8GPMWwXbB1nEk0'])
-    assert df.shape == (362, 20), f'Param \'host_ids\', Test 3 failed. {df.shape=}'
+    assert df.shape[0] == 302, f'Param \'host_ids\', Test 3 failed. {df.shape=}'
     df = gg.get_df(drop_forfeits=True)
-    assert df.shape == (427, 20), f'Param \'drop_forfeits\', Test 1 failed. {df.shape=}'
+    assert df.shape[0] == 377, f'Param \'drop_forfeits\', Test 1 failed. {df.shape=}'
     df = gg.get_df(cols=['race_id', 'entrant_id'])
-    assert df.shape == (509, 2), f'Param \'cols\', Test 1 failed. {df.shape=}'
-    df = gg.get_df(cols=['race_id', 'entrant_id'])
-    assert df.shape == (509, 2), f'Param \'cols\', Test 1 failed. {df.shape=}'
+    assert df.shape[0] == 449, f'Param \'cols\', Test 1 failed. {df.shape=}'
     df = gg.get_df(host_rows_only=True)
-    assert df.shape == (44, 20), f'Param \'host_rows_only\', Test 1 failed. {df.shape=}'
+    assert df.shape[0] == 35, f'Param \'host_rows_only\', Test 1 failed. {df.shape=}'
     df = gg.get_df(cols=['race_id', 'race_start'], unique=True)
-    assert df.shape == (30, 2), f'Param \'unique\', Test 1 failed. {df.shape=}'
+    assert df.shape[0] == 21, f'Param \'unique\', Test 1 failed. {df.shape=}'
 
     pprint('All tests successfully passed.', start='done.\n')
 

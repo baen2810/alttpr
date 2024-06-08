@@ -137,7 +137,11 @@ def pdidx(df, delimiter='_'):
     Flatten multiindex pandas dataframe and
     combine multiindex column names into a single level.
     '''
-    df = df.reset_index(drop=True)
+    idx = None
+    try:
+        idx = df.index
+    except:
+        pass
     col_lst = []
     for col in df.columns.values:
         if type(col) == tuple:
@@ -148,6 +152,8 @@ def pdidx(df, delimiter='_'):
         else:
             col_lst += [col]
     df.columns=col_lst
+    if idx is not None:
+        df.index = idx
     return df
 
 
