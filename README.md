@@ -51,6 +51,11 @@ pprint(f'Loaded Crawler Last updated: {to_tstr(loaded_gg.last_updated)}')
 
 pprint('Finished.')
 ```
+or simply do
+
+```py
+python ./example_create_save_load_crawler.py
+```
 
 ## License
 
