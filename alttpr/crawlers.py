@@ -401,8 +401,8 @@ class RacetimeCrawler:
             self.set_output_path(path)
         if not self.output_path.exists():
             self.output_path.mkdir(parents=True)
-        export_path = Path(self.output_path, 'hosts_df.xlsx')
-        self.hosts_df.to_excel(export_path, index=False, engine='openpyxl')
+        self.hosts_df.to_excel(Path(self.output_path, 'hosts_df.xlsx'), index=False, engine='openpyxl')
+        self.get_df().to_excel(Path(self.output_path, 'races_df.xlsx'), index=False, engine='openpyxl')
         print(f'Exported data to: {self.output_path}')
 
     def save(self) -> None:
