@@ -91,7 +91,7 @@ class RacetimeCrawler:
         self.weekday_dict_DE = {'0': 'Montag', '1': 'Dienstag', '2': 'Mittwoch', '3': 'Donnerstag', '4': 'Freitag', '5': 'Samstag', '6': 'Sonntag'}
 
     def get_df(self, host_ids: Union[str, List[str]] = [], drop_forfeits: bool = False, cols: List[str] = [],
-               host_rows_only: bool = False, windowed: Union[int, tuple] = None):
+               host_rows_only: bool = False, windowed: Union[int, tuple] = None, unique=False):
         host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
         host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
         cols = list(self.races_df_cols) if len(cols) == 0 else cols
@@ -105,6 +105,7 @@ class RacetimeCrawler:
             df = df[df.race_start >= min_race_date]
             df = df[df.race_start <= max_race_date]
         df = df[cols]
+        df = df.drop_duplicates() if unique else df            
         return df
     
     def get_facts():
@@ -199,7 +200,10 @@ class RacetimeCrawler:
                     try:
                         href_user = e.find('a', {"class": "user-pop inline moderator"})['href']
                     except:
-                        href_user = e.find('a', {"class": "user-pop inline"})['href']
+                        try:
+                            href_user = e.find('a', {"class": "user-pop inline"})['href']
+                        except:
+                            href_user = e.find('a', {"class": "user-pop inline supporter moderator"})['href']
                 entrant_rank = int(e.find('span', {"class": "place"}).text.strip().replace('th', '').replace('rd', '').replace('nd', '').replace('st', '').replace('—', '10_000'))
                 entrant_finishtime = e.find('time', {"class": "finish-time"}).text
                 entrant_finishtime = NAN_VALUE if entrant_finishtime=='None' else entrant_finishtime
