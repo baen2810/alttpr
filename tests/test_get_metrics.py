@@ -12,23 +12,27 @@ from alttpr.utils import to_tstr, pprint
 
 
 def main():
-    # Load crawler object with 830 races
+    # Create test data
+    # gg = RacetimeCrawler()
+    # gg.crawl(host_ids=["XzVwZWqJmkB5k8eb", "jb8GPMWwXbB1nEk0"])
+    # pprint(f'{gg.host_ids=}')  # Output: ['XzVwZWqJmkB5k8eb', 'jb8GPMWwXbB1nEk0']
+    # pprint(f'{gg.hosts_df.shape=}')  # Output: DataFrame with combined hosts data
+    # pprint(f'{to_tstr(gg.last_updated)=}')
+    # # Export the DataFrame to 'export/hosts_df.xlsx'
+    # gg.export()
+    # # Save the crawler object to 'export/racetime_crawler.pkl'
+    # gg.save()
+
+    # Load crawler object
     test_name = os.path.split(__file__)[-1].replace('.py', '()')
     pprint(f'----- Starting test \'{test_name}\'', start='\n')
     pprint('Loading test data')
     gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'data', 'racetime_crawler_830_races.pkl')))
-    gg.refresh_transforms()
-    gg.races_df_cols = [
-    'race_id', 'race_goal', 'race_permalink', 'race_info', 'race_state',
-    'race_start', 'race_timer', 'race_n_entrants', 'race_info_norm',
-    'race_timer_sec', 'is_game', 'mode_boots','race_mode', 'race_mode_simple', 'race_tournament',
-    'entrant_id', 'entrant_name', 'entrant_place', 'entrant_rank', 'entrant_finishtime',
-    'is_cr', 'race_start_weekday', 'entrant_has_medal', 'entrant_has_won',
-    'entrant_has_top10', 'entrant_has_forfeited',
-    ]
+    # gg.refresh_transforms()
+    gg.export()
     pprint('Testing', end='...')
-    df = gg.get_metrics()
-    assert df.shape == (165, 2), 'Test 1 failed'
+    df = gg.metrics_df
+    assert df.shape == (1065, 2), f'Test 1 failed. {df.shape=}'
 
     pprint('All tests successfully passed.', start='done.\n')
 

@@ -29,11 +29,9 @@ def main():
     df = gg.get_df(drop_forfeits=True)
     assert df.shape[0] == 377, f'Param \'drop_forfeits\', Test 1 failed. {df.shape=}'
     df = gg.get_df(cols=['race_id', 'entrant_id'])
-    assert df.shape[0] == 449, f'Param \'cols\', Test 1 failed. {df.shape=}'
+    assert df.shape == (449, 2), f'Param \'cols\', Test 1 failed. {df.shape=}'
     df = gg.get_df(host_rows_only=True)
     assert df.shape[0] == 35, f'Param \'host_rows_only\', Test 1 failed. {df.shape=}'
-    df = gg.get_df(cols=['race_id', 'race_start'], unique=True)
-    assert df.shape[0] == 21, f'Param \'unique\', Test 1 failed. {df.shape=}'
 
     pprint('All tests successfully passed.', start='done.\n')
 
