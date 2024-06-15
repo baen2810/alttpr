@@ -39,7 +39,7 @@ from warnings import warn
 from typing import List, Union
 from pathlib import Path
 from tqdm import trange, tqdm
-from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str
+from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str, to_tstr, to_dstr
 
 # import base64
 # import io
@@ -59,6 +59,7 @@ NAN_VALUE = np.nan
 if DEBUG:
     warnings.simplefilter(action='ignore', category=UserWarning)
     warnings.simplefilter(action='ignore', category=FutureWarning)
+    pd.options.mode.chained_assignment = None
 class RacetimeCrawlerException(Exception):
     """Base class for exceptions."""
 
@@ -73,7 +74,7 @@ class UnsupportedFormatError(RacetimeCrawlerException):
 
 class RacetimeCrawler:
     def __init__(self) -> None:
-        self.game_filter: str = 'alttpr'
+        self.game_filter: str = 'ALttPR'
         self.host_ids: List[str] = []
         self.race_ids: List[str] = []
         self.races_df_cols_cr: List[str] = [
@@ -83,8 +84,10 @@ class RacetimeCrawler:
         self.races_df_cols_tf: List[str] = []  # columns that are transformations
         self.hosts_df: pd.DataFrame = pd.DataFrame()
         self.races_df: pd.DataFrame = pd.DataFrame(columns=self.races_df_cols_cr)
+        self.stats_df: pd.DataFrame = pd.DataFrame()
         self.metrics_df: pd.DataFrame = pd.DataFrame()
         self.output_path: Path = Path(os.getcwd(), 'export')
+        self.stats_template_path: Path = Path(os.getcwd(), 'stats_template_alttpr.xlsx')
         self.base_url: str = r"https://racetime.gg"
         self.last_updated: pd.Timestamp = pd.Timestamp.now()
         self.community_race_thres = 5
@@ -96,7 +99,7 @@ class RacetimeCrawler:
         host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
         cols = self.races_df_cols_cr + self.races_df_cols_tf if len(cols) == 0 else cols
         df = self.races_df[self.races_df.race_id.isin(self.races_df[self.races_df.entrant_id.isin(host_ids)].race_id)]
-        df = df[[self.game_filter in r for r in df.race_id]] if game_filter else df
+        df = df[[self.game_filter.lower() in r for r in df.race_id]] if game_filter else df
         df = df.dropna(subset=['entrant_finishtime']) if drop_forfeits else df
         df = df[df.entrant_id.isin(host_ids)] if host_rows_only else df
         if type(windowed) == int:
@@ -110,17 +113,20 @@ class RacetimeCrawler:
         return df
     
     def refresh_transforms(self) -> None:
-        pprint('Refreshing all transforms', end='...')
+        pprint('Refreshing all transforms')
         self._parse_race_info()
         self.get_metrics()
-        print('done.')
+        self.get_stats()
+        pprint('All transforms refreshed')
         pprint(f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})') if len(self._list_ids_in_races_df()) != len(self.race_ids) else None
         pprint(f'Number of columns in races_df ({len(self.races_df.columns)}) does not match number of cols in self.races_df_cols_cr + _tf ({len(self.races_df_cols_cr) + len(self.races_df_cols_tf)})') if len(self.races_df_cols_cr) + len(self.races_df_cols_tf) != len(self.races_df.columns) else None
     
     def get_metrics(self, windowed: Union[int, tuple] = None):
         df = self.get_df(host_rows_only=True, windowed=windowed)
         idx_col = 'entrant_name'
-        groupby_col_lst = ['race_tournament_simple', 'race_start_weekday', 'entrant_place', 'race_mode_simple']
+        groupby_col_lst = ['race_category', 'race_group', 'race_start_weekday', 'entrant_place', 'race_mode_simple']
+        to_date_cols_lst = ['race_start_', 'entrant_has_won_', 'entrant_has_medal_', 'entrant_has_forfeited_']
+        to_time_cols_lst = ['entrant_finishtime_']
         agg_dict = {
             'race_start' : ['min', 'count', 'max'],
             'entrant_finishtime': ['min', 'max', 'median'],
@@ -139,13 +145,33 @@ class RacetimeCrawler:
                 index=idx_col,
                 columns=groupby_col,
                 values=values_lst))
+            df_tmp.columns = [c.replace(c.split('_')[-1], 'if_' + groupby_col + '_is_' + c.split('_')[-1]) for c in df_tmp.columns]
             df_out = pd.concat([df_out, df_tmp], axis=1)
+        # streamline timestamps
+        for c in df_out.columns:
+            if any([d == c[:len(d)] for d in to_date_cols_lst]) and not(any([d in c for d in ['count']])):
+                df_out[c] = [to_dstr(e) if type(e).__name__ != 'NaTType' else e for e in df_out[c]]
+            elif any([d == c[:len(d)] for d in to_time_cols_lst]) and not(any([d == c[:len(d)] for d in ['count']])):
+                df_out[c] = [to_tstr(e) if type(e).__name__ != 'NaTType' else e for e in df_out[c]]
+        # ad special metrics
+        df_raw_counts = pdidx(self.get_df(host_rows_only=True, game_filter=False)[['entrant_name', 'race_start']].groupby('entrant_name').count())
+        df_raw_counts.columns = ['unfiltered_race_starts']
+        df_out = pd.concat([df_out, df_raw_counts], axis=1)
         df_out = df_out.T.rename_axis('metric').sort_values('metric').reset_index()
-        pprint(f'Created {df_out.shape[0]} metrics for {df_out.shape[1]} racers')
+        pprint(f'Created {df_out.shape[0]} metrics for {df_out.shape[1]-1} racers')
         self.metrics_df = df_out
 
-    def get_facts():
-        pass
+    def get_stats(self):
+        df_stats = pd.read_excel(self.stats_template_path).dropna()
+        df_stats.ID = df_stats.ID.astype(int)
+        metrics_lst = '<' + self.metrics_df.metric + '>'
+        for host_name in list(self.hosts_df.host_name):
+            metrics_dict = dict(zip(metrics_lst, self.metrics_df[host_name]))
+            df_stats[host_name] = df_stats.Template.str.replace('<host_name>', host_name)
+            df_stats[host_name] = df_stats[host_name].str.replace('<game_filter>', self.game_filter)
+            for k, v in metrics_dict.items():
+                df_stats[host_name] = [f.replace(k, str(v)) for f in df_stats[host_name]]
+        self.stats_df = df_stats
     
     def crawl(self, host_ids: Union[str, List[str]], n_pages: int = None) -> None:
         self._get_hosts(host_ids)
@@ -153,6 +179,7 @@ class RacetimeCrawler:
         self._get_races_data()
         self._parse_race_info()
         self.get_metrics()
+        self.get_stats()
         pprint(f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})') if len(self._list_ids_in_races_df()) != len(self.race_ids) else None
         pprint(f'Number of columns in races_df ({len(self.races_df.columns)}) does not match number of cols in self.races_df_cols_cr + _tf ({len(self.races_df_cols_cr) + len(self.races_df_cols_tf)})') if len(self.races_df_cols_cr) + len(self.races_df_cols_tf) != len(self.races_df.columns) else None
             
@@ -277,7 +304,7 @@ class RacetimeCrawler:
         df.race_start = df.race_start.dt.tz_localize(None)
         df.race_start = [r.replace(microsecond=0) for r in df.race_start]
         df.race_n_entrants = pd.to_numeric(df.race_n_entrants)
-        df.entrant_place = [e.strip() for e in df.entrant_place]
+        df.entrant_place = [e.strip() if type(e) != float else e for e in df.entrant_place]
         df.entrant_place = df.entrant_place.replace('—', NAN_VALUE)
         df.entrant_id = df.entrant_id.str.replace('/user/', '')
         # df.entrant_finishtime = pd.to_datetime(['1900-01-01 ' + t if t != '—' else NAN_VALUE for t in df.entrant_finishtime])
@@ -403,8 +430,8 @@ class RacetimeCrawler:
         for r in df.race_info_norm:
             if 'rivalcup' in r:
                 tournament = 'Rival Cup'
-            elif 'deutschesweekly' in r:  # Edge Cases; don't use rd
-                tournament = 'Deutsches Weekly'
+            elif 'deutschesweekly' in r or 'sgdeweeklyrace' in r or 'sgdeweekly' in r:
+                tournament = 'German Weekly'        
             elif 'deutschesalttprturnier' in r:
                 tournament = 'Deutsches ALttPR Turnier'
             elif 'alttprtournament' in r or 'alttprmaintournament' in r or'alttpr2021tournament' in r:
@@ -415,19 +442,17 @@ class RacetimeCrawler:
                 tournament = 'ALttPR League'
             elif 'sgdeminiturnier' in r.replace('-', '') or 'deutschesminiturnier' in r.replace('-', ''):
                 tournament = 'SGDE Miniturnier'
-            elif 'sgdeweeklyrace' in r or 'sgdeweekly' in r:
-                tournament = 'Deutsches Weekly'        
-            elif 'speedgamingdailyraceseries' in r:  # Edge Cases; don't use rd
+            elif 'speedgamingdailyraceseries' in r:
                 tournament = 'SpeedGaming Daily Race Series'
-            elif 'crosskeystourn' in r or 'crosskeys202' in r or 'crosskeysswiss' in r:  # Edge Cases; don't use rd
+            elif 'crosskeystourn' in r or 'crosskeys202' in r or 'crosskeysswiss' in r:
                 tournament = 'Crosskeys Tournament'
-            elif 'enemizertournament' in r:  # Edge Cases; don't use rd
+            elif 'enemizertournament' in r:
                 tournament = 'Enemizer Tournament'
-            elif 'alttprswordless' in r:  # Edge Cases; don't use rd
+            elif 'alttprswordless' in r:
                 tournament = 'ALttPR Swordless'
-            elif 'communityrace' in r:  # Edge Cases; don't use rd
+            elif 'communityrace' in r:
                 tournament = 'Community Race'
-            elif 'qualifier' in r:  # Edge Cases; don't use rd
+            elif 'qualifier' in r:
                 tournament = 'Qualifier'
             else:
                 tournament = NAN_VALUE
@@ -436,9 +461,10 @@ class RacetimeCrawler:
             tournament_lst += [tournament]
         # df['rr_info_cleansed'] = r_lst
         df['race_tournament'] = tournament_lst
-        df['race_tournament_simple'] = [r if r in ['German Weekly', 'Community Race'] else 'Tournament' for r in df.race_tournament]
-        # df_races = df_races_tmp.set_index('race_id').join(df[['race_id', 'rr_permalink', 'rr_info', 'race_tournament', 'race_mode', 'race_mode_simple', 'mode_boots']].set_index('race_id')).reset_index()
         df.race_tournament = ['Community Race' if e >= self.community_race_thres and type(t) == float else t for e,t in zip(df.race_n_entrants, df.race_tournament)]
+        df['race_category'] = [r if r in ['German Weekly', 'Community Race'] else 'Tournament' for r in df.race_tournament]
+        df['race_group'] = ['Community-/Weekly-Race' if r in ['German Weekly', 'Community Race'] else 'Tournament' for r in df.race_tournament]
+        # df_races = df_races_tmp.set_index('race_id').join(df[['race_id', 'rr_permalink', 'rr_info', 'race_tournament', 'race_mode', 'race_mode_simple', 'mode_boots']].set_index('race_id')).reset_index()
         df = df.sort_values(['race_start', 'entrant_place'], ascending=[False, True]).reset_index(drop=True)
         self.races_df_cols_tf = [c for c in df.columns if c not in self.races_df_cols_cr]
         self.races_df = df
@@ -458,7 +484,7 @@ class RacetimeCrawler:
     def set_output_path(self, path: Union[Path, str]) -> None:
         self.output_path = Path(path)
 
-    def export(self, path: Union[Path, str] = None, dfs: List[str] = ['hosts_df', 'races_df', 'metrics_df']) -> None:
+    def export(self, path: Union[Path, str] = None, dfs: List[str] = ['hosts_df', 'races_df', 'metrics_df', 'stats_df']) -> None:
         if path:
             self.set_output_path(path)
         if not self.output_path.exists():
@@ -466,10 +492,12 @@ class RacetimeCrawler:
         pprint(f'Exporting data to: {self.output_path}', end='...')
         self.hosts_df.to_excel(Path(self.output_path, 'hosts_df.xlsx'), index=False, engine='openpyxl') if 'hosts_df' in dfs else None
         self.get_df().to_excel(Path(self.output_path, 'races_df.xlsx'), index=False, engine='openpyxl') if 'races_df' in dfs else None
-        df_metrics = self.metrics_df.reset_index().astype(str)
+        df_metrics = self.metrics_df.astype(str)
         for c in df_metrics.columns:
             df_metrics[c] = [d.replace('NaT', '').replace('nan', '').replace('0 days ', '') for d in df_metrics[c]]
         df_metrics.to_excel(Path(self.output_path, 'metrics_df.xlsx'), index=False, engine='openpyxl') if 'metrics_df' in dfs else None
+        df_stats = self.stats_df.astype(str)
+        df_stats.to_excel(Path(self.output_path, 'stats_df.xlsx'), index=False, engine='openpyxl') if 'stats_df' in dfs else None
         print('done.')
 
     def save(self) -> None:

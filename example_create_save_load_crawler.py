@@ -4,7 +4,11 @@ from alttpr.utils import to_tstr, pprint
 def main():
     # Example usage
     gg = RacetimeCrawler()
-    gg.crawl(host_ids=["XzVwZWqJmkB5k8eb", "jb8GPMWwXbB1nEk0"], n_pages=2)
+    gg.crawl(host_ids=[
+        "XzVwZWqJmkB5k8eb", "jb8GPMWwXbB1nEk0"
+        ],
+        # n_pages=2,
+        )
     # print('HERE')
     pprint(f'{gg.host_ids=}')  # Output: ['XzVwZWqJmkB5k8eb', 'jb8GPMWwXbB1nEk0']
     pprint(f'{gg.hosts_df.shape=}')  # Output: DataFrame with combined hosts data

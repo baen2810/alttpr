@@ -26,13 +26,12 @@ def main():
     # Load crawler object
     test_name = os.path.split(__file__)[-1].replace('.py', '()')
     pprint(f'----- Starting test \'{test_name}\'', start='\n')
-    pprint('Loading test data')
-    gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'data', 'racetime_crawler_830_races.pkl')))
-    # gg.refresh_transforms()
+    gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'data', 'racetime_crawler_test_stats_2024-06-15_REFERENCE.pkl')))
+    gg.refresh_transforms()
     gg.export()
-    pprint('Testing', end='...')
     df = gg.metrics_df
-    assert df.shape == (1065, 2), f'Test 1 failed. {df.shape=}'
+    pprint('Testing', end='...')
+    assert df.shape == (1095, 3), f'Test 1 failed. {df.shape=}'
 
     pprint('All tests successfully passed.', start='done.\n')
 
