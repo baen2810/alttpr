@@ -29,11 +29,13 @@ def main():
     gg = RacetimeCrawler.load(Path(os.path.join(os.path.dirname(__file__), 'data', 'racetime_crawler_test_stats_2024-06-15_REFERENCE.pkl')))
     gg.stats_template_path = Path(os.getcwd(), 'stats_template_alttpr.xlsx')
     gg.game_filter = 'ALttPR'
+    gg.weekday_dict_EN = {'0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday'}
     gg.refresh_transforms()
+    gg.save()
     gg.export()
     df = gg.metrics_df
     pprint('Testing', end='...')
-    assert df.shape == (1111, 3), f'Test 1 failed. {df.shape=}'
+    assert df.shape == (15039, 10), f'Test 1 failed. {df.shape=}'
 
     pprint('All tests successfully passed.', start='done.\n')
 

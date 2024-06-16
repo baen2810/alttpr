@@ -132,7 +132,7 @@ def pdcols(df, replace_dict={
     return df
 
 
-def pdidx(df, delimiter='_'):
+def pdidx(df, delimiter='|'):
     '''
     Flatten multiindex pandas dataframe and
     combine multiindex column names into a single level.
