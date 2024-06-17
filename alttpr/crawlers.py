@@ -91,8 +91,9 @@ class RacetimeCrawler:
         self.base_url: str = r"https://racetime.gg"
         self.last_updated: pd.Timestamp = pd.Timestamp.now()
         self.community_race_thres = 5
-        self.weekday_dict_DE = {'0': 'Montag', '1': 'Dienstag', '2': 'Mittwoch', '3': 'Donnerstag', '4': 'Freitag', '5': 'Samstag', '6': 'Sonntag'}
+        self.weekday_dict_DE = {'Monday': 'Montag', 'Tuesday': 'Dienstag', 'Wednesday': 'Mittwoch', 'Thursday': 'Donnerstag', 'Friday': 'Freitag', 'Saturday': 'Samstag', 'Sunday': 'Sonntag'}
         self.weekday_dict_EN = {'0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday'}
+        self.lang='DE'
 
     def get_df(self, host_ids: Union[str, List[str]] = [], drop_forfeits: bool = False, cols: List[str] = [],
                host_rows_only: bool = False, windowed: Union[int, tuple] = None, unique: bool = False,
@@ -123,16 +124,18 @@ class RacetimeCrawler:
     def refresh_transforms(self) -> None:
         pprint('Refreshing all transforms')
         self._parse_race_info()
+        pprint('Refreshing all metrics')
         self.get_metrics()
+        pprint('Refreshing all stats')
         self.get_stats()
-        pprint('All transforms refreshed')
+        pprint('Everything up to date')
         pprint(f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})') if len(self._list_ids_in_races_df()) != len(self.race_ids) else None
         pprint(f'Number of columns in races_df ({len(self.races_df.columns)}) does not match number of cols in self.races_df_cols_cr + _tf ({len(self.races_df_cols_cr) + len(self.races_df_cols_tf)})') if len(self.races_df_cols_cr) + len(self.races_df_cols_tf) != len(self.races_df.columns) else None
     
     def get_metrics(self,
-                    windows_dict: dict = {'last_race': 0, 'total': None, },
-                    drop_forfeits_dict: dict = {'forfeits_excluded': True, 'forfeits_included': False, },
-                    entrant_has_medal_dict: dict = {'medal_races': True, 'all_races': None, },
+                    windows_dict: dict = {'total': None, 'last_race': 0, },
+                    drop_forfeits_dict: dict = {'forfeits_included': False, 'forfeits_excluded': True, },
+                    entrant_has_medal_dict: dict = {'all_races': None, 'medal_races': True, },
                     ):
         df = pd.DataFrame()
         for window_name, window in windows_dict.items():
@@ -160,26 +163,30 @@ class RacetimeCrawler:
         groupby_col_lst = ['race_category', 'race_group', 'race_start_weekday', 'entrant_place', 'race_mode_simple']
         to_date_cols_lst = [
             'race_start|', 'entrant_has_won|', 'entrant_has_medal|', 'entrant_has_forfeited|',  'entrant_has_top10',
-            'entrant_below_2h00m|', 'entrant_below_1h45m|', 'entrant_below_1h30m|', 'entrant_below_1h15m|',
-            'entrant_below_1h00m|',]
+            'entrant_below_2h00m|', 'entrant_below_1h45m|', 'entrant_below_1h30m|', 'entrant_below_1h15m|', 'entrant_below_1h00m|',
+            'entrant_is_last',]
         to_time_cols_lst = ['entrant_finishtime|']
         pct_base_metrics_lst = [
             'race_start|count|if|race_group|is|Community-/Weekly-Race'
             ]
         agg_dict = {
-            'race_start' : ['min', 'count', 'max'],
-            'entrant_finishtime': ['min', 'max', 'median'],
-            'entrant_rank': ['min', 'max', 'median'],
-            'race_n_forfeits': ['min', 'max', 'median'],
-            'entrant_has_won' : ['count', 'min', 'max'],
-            'entrant_has_medal' : ['count', 'min', 'max'],
-            'entrant_has_top10' : ['count', 'min', 'max'],
-            'entrant_has_forfeited' : ['count', 'min', 'max'],
-            'entrant_below_2h00m' : ['count', 'min', 'max'],
-            'entrant_below_1h45m' : ['count', 'min', 'max'],
-            'entrant_below_1h30m' : ['count', 'min', 'max'],
-            'entrant_below_1h15m' : ['count', 'min', 'max'],
-            'entrant_below_1h00m' : ['count', 'min', 'max'],
+            'entrant_finishtime':           ['min', 'max', 'median'],
+            'entrant_rank':                 ['min', 'max', 'median'],
+            'race_n_forfeits':              ['min', 'max', 'median'],
+            'race_last_place':              ['min', 'max', 'median'],
+            'entrant_distance_to_last':     ['min', 'max', 'median'],
+            'race_start' :                  ['count', 'min', 'max'],
+            'entrant_has_won':              ['count', 'min', 'max'],
+            'entrant_has_medal':            ['count', 'min', 'max'],
+            'entrant_has_top10':            ['count', 'min', 'max'],
+            'entrant_has_forfeited':        ['count', 'min', 'max'],
+            'entrant_below_2h00m':          ['count', 'min', 'max'],
+            'entrant_below_1h45m':          ['count', 'min', 'max'],
+            'entrant_below_1h30m':          ['count', 'min', 'max'],
+            'entrant_below_1h15m':          ['count', 'min', 'max'],
+            'entrant_below_1h00m':          ['count', 'min', 'max'],
+            'race_n_entrants':              ['count', 'min', 'max'],
+            'entrant_is_last':              ['count', 'min', 'max'],
         }
         values_lst = []
         for k, v_lst in agg_dict.items():
@@ -194,7 +201,49 @@ class RacetimeCrawler:
                 values=values_lst))
             df_tmp.columns = [c.replace(c.split('|')[-1], 'if|' + groupby_col + '|is|' + c.split('|')[-1]) for c in df_tmp.columns]
             df_out = pd.concat([df_out, df_tmp], axis=1)
+        # get topN stats
+        df_cr = df[df.race_group=='Community-/Weekly-Race']
+        topN_groupby_col_lst = [
+            # (topN_groupby_col, ranked_col, ascending)
+            ('entrant_place', 'entrant_rank|count', False), 
+            ('race_start_weekday', 'entrant_rank|count', False),
+            ('race_start_weekday', 'entrant_rank|count', True),
+            ]
+        topN_metric_col_lst = ['entrant_rank']
+        topN_agg_dict = {
+            'entrant_rank':           ['count', 'median',], #'min', 'max'
+        }
+        for topN_groupby_col_tuple in topN_groupby_col_lst:
+            topN_groupby_col, ranked_col, ascending = topN_groupby_col_tuple
+            # if topN_groupby_col == 'race_start_weekday':
+            #     print('now')
+            df_tmp = pdidx(df_cr[[idx_col, topN_groupby_col] + metrics_cols].groupby(
+                [idx_col, topN_groupby_col]).agg(topN_agg_dict)).reset_index().sort_values([idx_col, ranked_col], ascending=False)
+            rank_varname = '|' + topN_groupby_col + '_topN|'
+            df_tmp[rank_varname] = df_tmp.groupby(idx_col)[ranked_col].rank("dense", ascending=ascending)
+            df_tmp = df_tmp.sort_values(by=[idx_col, rank_varname], ascending=False)
+            df_tmp[rank_varname] = df_tmp[rank_varname].astype(int).astype(str)
+            df_tmp_str = df_tmp[[idx_col, rank_varname, topN_groupby_col]].pivot_table(
+                index=idx_col,
+                columns=rank_varname,
+                values=[topN_groupby_col],
+                aggfunc='first'
+            )
+            df_tmp = df_tmp.pivot_table(
+                index=idx_col,
+                columns=rank_varname,
+                values=list(df_tmp.columns.drop([idx_col, rank_varname, topN_groupby_col]))
+            )
+            df_tmp = pdidx(df_tmp, delimiter='$')
+            df_tmp.columns = [c.replace('$', '|if' + rank_varname + 'is|') for c in df_tmp.columns]
+            df_tmp_str = pdidx(df_tmp_str, delimiter='$')
+            df_tmp_str.columns = [c.replace('$', '|first|if' + rank_varname + 'is|') for c in df_tmp_str.columns]
+            df_tmp = pd.concat([df_tmp, df_tmp_str], axis=1)
+            asc_str = '_topN_sorted_asc_by_' if ascending else '_topN_sorted_desc_by_'
+            df_tmp.columns = [c.replace('_topN', asc_str + ranked_col.replace('|', '_')) for c in df_tmp.columns]
+            df_out = pd.concat([df_out, df_tmp], axis=1)
         # streamline timestamps
+        # df_out = df_bk.copy()
         for c in df_out.columns:
             if any([d == c[:len(d)] for d in to_date_cols_lst]) and not(any([d in c for d in ['count']])):
                 df_out[c] = [to_dstr(e) if type(e).__name__ != 'NaTType' else e for e in df_out[c]]
@@ -208,7 +257,7 @@ class RacetimeCrawler:
                     '|min', '|min-time').replace(
                     '|max', '|max-time').replace(
                     '|median', '|median-time')})
-            elif c.split('|')[1] in ['median', 'min', 'max']:
+            elif c.split('|')[1] in ['median', 'min', 'max', 'count']:
                 df_out[c] = [str(int(round(e, 0))) if not(pd.isna(e)) else e for e in df_out[c]]
         # add days past for date columns
         df_days_past = df_out[[c for c in df_out.columns if '-date' in c]]
@@ -224,7 +273,7 @@ class RacetimeCrawler:
             base_metric_df = df_out[df_out.metric==base_metric]
             df_pct = df_pct_metrics.copy()
             for c in list(self.hosts_df.host_name):
-                df_pct[c] = df_pct_metrics[c] / list(base_metric_df[c])[0]
+                df_pct[c] = df_pct_metrics[c].astype(float) / list(base_metric_df[c].astype(float))[0]
                 df_pct[c] = [str(int(round(v*100, 0))) + '%' if not(pd.isna(v)) else v for v in df_pct[c]]
             df_pct.metric = df_pct.metric.str.replace('|count|', f'|pct_b{i+1}|')
             df_out = pd.concat([df_out, df_pct], axis=0)
@@ -240,6 +289,17 @@ class RacetimeCrawler:
             df_stats[host_name] = df_stats[host_name].str.replace('<game_filter>', self.game_filter)
             for k, v in metrics_dict.items():
                 df_stats[host_name] = [f.replace(k, str(v)) for f in df_stats[host_name]]
+            if self.lang=='DE':
+                for k, v in self.weekday_dict_DE.items():
+                    df_stats[host_name] = [f.replace(k, str(v)) for f in df_stats[host_name]]
+                for k, v in {'st Platz': '. Platz', 'nd Platz': '. Platz', 'rd Platz': '. Platz', 'th Platz': '. Platz'}.items():
+                    df_stats[host_name] = [f.replace(k, str(v)) for f in df_stats[host_name]]
+                df_stats[host_name] = [f.replace('vor 0 Tag(en)', 'heute') for f in df_stats[host_name]]
+                df_stats[host_name] = [f.replace('in 1 Races', 'in 1 Race') for f in df_stats[host_name]]
+                df_stats[host_name] = [f.replace('vor 1 Tag(en)', 'gestern').replace('vor 1 Tag', 'gestern') for f in df_stats[host_name]]
+                df_stats[host_name] = [f.replace('vor 2 Tag(en)', 'vorgestern').replace('vor 2 Tagen', 'vorgestern') for f in df_stats[host_name]]
+                df_stats[host_name] = [f.replace('Tag(en)', 'Tagen') for f in df_stats[host_name]]
+                # df_stats[host_name] = df_stats[host_name]
         self.stats_df = df_stats
     
     def crawl(self, host_ids: Union[str, List[str]], n_pages: int = None) -> None:
@@ -384,12 +444,15 @@ class RacetimeCrawler:
         df['race_info_norm'] = [clean_race_info_str(txt) for txt in df.race_info]
         df['race_timer_sec'] = [int(r.split(':')[0])*60*60 + int(r.split(':')[1])*60 + int(r.split(':')[2]) for r in df.race_timer]
         df['race_n_forfeits'] = df.set_index('race_id').join(df[df.entrant_place.isna()][['race_id', 'race_goal']].groupby('race_id').count(), rsuffix='_cnt').reset_index().race_goal_cnt.fillna(0).astype(int)
+        df['race_last_place'] = [e - f for f, e in zip(df.race_n_forfeits, df.race_n_entrants)]
         df['is_game'] = [1 if self.game_filter in r.lower() else 0 for r in df.race_id]
         df['race_start_weekday'] = df.race_start.dt.weekday.astype(str).replace(self.weekday_dict_EN)  # 0=Montag
         df['entrant_has_medal'] = pd.to_datetime([d.date() if r <= 3 else NAN_VALUE for d, r in zip(df.race_start, df.entrant_rank)])
         df['entrant_has_won'] = pd.to_datetime([d.date() if r <= 1 else NAN_VALUE for d, r in zip(df.race_start, df.entrant_rank)])
         df['entrant_has_top10'] = pd.to_datetime([d.date() if r <= 10 else NAN_VALUE for d, r in zip(df.race_start, df.entrant_rank)])
         df['entrant_has_forfeited'] = pd.to_datetime([d.date() if pd.isna(r) else NAN_VALUE for d, r in zip(df.race_start, df.entrant_place)])
+        df['entrant_is_last'] = pd.to_datetime([d.date() if r == l else NAN_VALUE for d, r, l in zip(df.race_start, df.entrant_rank, df.race_last_place)])
+        df['entrant_distance_to_last'] = [l - r for r, l in zip(df.entrant_rank, df.race_last_place)]
         df['entrant_below_2h00m'] = pd.to_datetime([d.date() if r < pd.Timedelta('02:00:00') else NAN_VALUE for d, r in zip(df.race_start, df.entrant_finishtime)])
         df['entrant_below_1h45m'] = pd.to_datetime([d.date() if r < pd.Timedelta('01:45:00') else NAN_VALUE for d, r in zip(df.race_start, df.entrant_finishtime)])
         df['entrant_below_1h30m'] = pd.to_datetime([d.date() if r < pd.Timedelta('01:30:00') else NAN_VALUE for d, r in zip(df.race_start, df.entrant_finishtime)])
