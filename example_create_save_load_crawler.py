@@ -7,7 +7,7 @@ def main():
     gg.crawl(host_ids=[
         "XzVwZWqJmkB5k8eb", "jb8GPMWwXbB1nEk0"
         ],
-        # n_pages=2,
+        n_pages=2,
         )
     # print('HERE')
     pprint(f'{gg.host_ids=}')  # Output: ['XzVwZWqJmkB5k8eb', 'jb8GPMWwXbB1nEk0']
@@ -27,7 +27,6 @@ def main():
     pprint(f'{len(loaded_gg.race_ids)=}')  # Output: DataFrame with combined hosts data
     pprint(f'{loaded_gg.metrics_df.shape=}')  # Output: DataFrame with combined hosts data
     pprint(f'{to_tstr(loaded_gg.last_updated)=}')    
-
     pprint('Finished.')
 
 if __name__ == "__main__":

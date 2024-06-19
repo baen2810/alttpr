@@ -2,6 +2,7 @@
 venv/
 # Logfiles
 logs/
+tests/data/temp_data/
 scripts/
 export/
 __pycache__/
