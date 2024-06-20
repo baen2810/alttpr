@@ -32,6 +32,9 @@ def main():
     assert df.shape == (449, 2), f'Param \'cols\', Test 1 failed. {df.shape=}'
     df = gg.get_df(host_rows_only=True)
     assert df.shape[0] == 35, f'Param \'host_rows_only\', Test 1 failed. {df.shape=}'
+    # TODO update test data to include generic filter
+    # df = gg.get_df(host_rows_only=True, host_ids='XzVwZWqJmkB5k8eb', generic_filter=('race_group', 'Community-/Weekly-Race'))
+    # assert df.shape[0] == 217, f'Param \'generic_filter\', Test 1 failed. {df.shape=}'
     # TODO params windowed (3), unique (1), game_filter (1), entrant_has_won (2)
 
     pprint('All tests successfully passed.', start='done.\n')

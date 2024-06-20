@@ -95,14 +95,16 @@ class RacetimeCrawler:
         self.weekday_dict_EN = {'0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday'}
         self.lang='DE'
 
-    def get_df(self, host_ids: Union[str, List[str]] = [], drop_forfeits: bool = False, cols: List[str] = [],
+    def get_df(self, host_ids: Union[str, List[str]] = [], generic_filter: tuple = (None, None), drop_forfeits: bool = False, cols: List[str] = [],
                host_rows_only: bool = False, windowed: Union[int, tuple] = None, unique: bool = False,
                game_filter: bool = True, entrant_has_medal: bool = None, ) -> pd.DataFrame:
-        # TODO integrate base filter (Weekly-/Community-Race) parameter
+        # TODO integrate host_name filter
+        filter_col, filter_val = generic_filter
         host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
         host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
         cols = self.races_df_cols_cr + self.races_df_cols_tf if len(cols) == 0 else cols
         df = self.races_df[self.races_df.race_id.isin(self.races_df[self.races_df.entrant_id.isin(host_ids)].race_id)]
+        df = df if filter_col is None else df[df[filter_col]==filter_val]
         df = df[[self.game_filter.lower() in r for r in df.race_id]] if game_filter else df
         df = df.dropna(subset=['entrant_finishtime']) if drop_forfeits else df
         df = df[df.entrant_id.isin(host_ids)] if host_rows_only else df
@@ -386,6 +388,7 @@ class RacetimeCrawler:
         if len(race_ids_to_crawl) > 0:
             pprint(f'Crawling {len(race_ids_to_crawl)} new races.')
             new_races_df = pd.concat([self._get_race_data(r) for r in tqdm(race_ids_to_crawl, desc=pprintdesc('Crawling races'))], ignore_index=True)
+            new_races_df.race_start = new_races_df.race_start.dt.tz_localize(None)  # TODO messy. store raw data separately from transformed data
             self.races_df = pd.concat([self.races_df, new_races_df], ignore_index=True).sort_values(['race_start', 'entrant_place'], ascending=[False, True]).reset_index(drop=True)
         else:
             pprint('No new races detected. Crawler is up to date.')
@@ -644,23 +647,23 @@ class RacetimeCrawler:
     def set_output_path(self, path: Union[Path, str]) -> None:
         self.output_path = Path(path)
 
-    def export(self, path: Union[Path, str] = None, dfs: List[str] = ['hosts_df', 'races_df', 'metrics_df', 'stats_df']) -> None:
-        if path:
-            self.set_output_path(path)
+    def export(self, path: Union[Path, str] = None, dfs: List[str] = ['hosts_df', 'races_df', 'metrics_df', 'stats_df'], host_names: Union[str, List[str]] = []) -> None:
+        host_names = [host_names] if isinstance(host_names, str) else host_names
+        host_names = list(self.hosts_df.host_name) if len(host_names) == 0 else host_names
         if not self.output_path.exists():
             self.output_path.mkdir(parents=True)
         pprint(f'Exporting data to: {self.output_path}', end='...')
-        self.hosts_df.to_excel(Path(self.output_path, 'hosts_df.xlsx'), index=False, engine='openpyxl') if 'hosts_df' in dfs else None
+        self.hosts_df[self.hosts_df.host_name.isin(host_names)].to_excel(Path(self.output_path, 'hosts_df.xlsx'), index=False, engine='openpyxl') if 'hosts_df' in dfs else None
         self.get_df().to_excel(Path(self.output_path, 'races_df.xlsx'), index=False, engine='openpyxl') if 'races_df' in dfs else None
-        df_metrics = self.metrics_df.astype(str)
+        df_metrics = self.metrics_df[['scope', 'forfeits', 'win_filter', 'name', 'aggregation', 'pivoted_by', 'pivot_label', 'metric'] + host_names].dropna(how='all', subset=host_names).astype(str)
         for c in df_metrics.columns:
             df_metrics[c] = [d.replace('NaT', '').replace('nan', '').replace('0 days ', '') for d in df_metrics[c]]
         df_metrics.to_excel(Path(self.output_path, 'metrics_df.xlsx'), index=False, engine='openpyxl') if 'metrics_df' in dfs else None
-        df_stats = self.stats_df.astype(str)
+        df_stats = self.stats_df[['ID', 'Kategorie', 'Template'] + host_names].astype(str).dropna(how='all', subset=host_names).astype(str)
         df_stats.to_excel(Path(self.output_path, 'stats_df.xlsx'), index=False, engine='openpyxl') if 'stats_df' in dfs else None
         print('done.')
-
-    def save(self) -> None:
+    
+    def save(self, path: Union[Path, str] = None) -> None:
         if not self.output_path.exists():
             self.output_path.mkdir(parents=True)
         save_path = Path(self.output_path, 'racetime_crawler.pkl')

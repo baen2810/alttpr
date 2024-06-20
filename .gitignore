@@ -7,3 +7,4 @@ scripts/
 export/
 __pycache__/
 .ipynb_checkpoints/
+alttpr_crawler.py
