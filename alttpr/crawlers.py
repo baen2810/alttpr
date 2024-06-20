@@ -28,6 +28,12 @@
 
 """Racetime.gg Crawler"""
 
+# TODO add_race() method and check error in race 'https://racetime.gg/ootr/adequate-starfox-1938'
+# TODO improved parsing and transform speed
+# TODO implement game filter early while parsing
+# TODO determe where and whether self.hosts_df gets updated in crawl()
+# TODO skip data transformation if no new races were detected
+
 # from __future__ import annotations
 # from collections.abc import Callable, Iterator
 # from functools import reduce
