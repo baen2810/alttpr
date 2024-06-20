@@ -33,6 +33,7 @@
 # TODO implement game filter early while parsing
 # TODO determe where and whether self.hosts_df gets updated in crawl()
 # TODO skip data transformation if no new races were detected
+# TODO make sure ongoing races don't get crawled
 
 # from __future__ import annotations
 # from collections.abc import Callable, Iterator
