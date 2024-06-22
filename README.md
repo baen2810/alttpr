@@ -19,7 +19,13 @@ for details on getting up and running with your very own robot friend.
 
 Clone the repository. This will create a directory `alttpr` in the current working directory.
 
-Import 
+Install requirements:
+
+```py
+pip install -r requirements.txt
+```
+
+Run the code snippet:
 
 ```py
 from alttpr.crawlers import RacetimeCrawler
