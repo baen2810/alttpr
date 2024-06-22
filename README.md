@@ -34,7 +34,7 @@ Run the script
 python ./example_create_save_load_crawler.py
 ```
 
-or run the code snippet using in IDE of your choice:
+or run the code snippet using an IDE of your choice:
 
 ```py
 from alttpr.crawlers import RacetimeCrawler
