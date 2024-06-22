@@ -28,7 +28,13 @@ Change the working dir to './alttpr:
 cd ./alttpr
 ```
 
-Run the code snippet:
+Run the script
+
+```py
+python ./example_create_save_load_crawler.py
+```
+
+or run the code snippet using in IDE of your choice:
 
 ```py
 from alttpr.crawlers import RacetimeCrawler
@@ -60,11 +66,6 @@ pprint(f'Loaded Crawler races_df.shape: {loaded_gg.races_df.shape}')  # Output: 
 pprint(f'Loaded Crawler Last updated: {to_tstr(loaded_gg.last_updated)}')
 
 pprint('Finished.')
-```
-or simply do
-
-```py
-python ./example_create_save_load_crawler.py
 ```
 
 ## License
