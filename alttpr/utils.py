@@ -42,11 +42,20 @@ def to_tstr(ts):
     tsn = ts
     if type(ts) == pd.Timedelta:
         tsn = pd.Timestamp('1900-01-01') + ts
-    return tsn.strftime('%H:%M:%S')
+    try:
+        tsn = tsn.strftime('%H:%M:%S')
+    except:
+        pass
+    return tsn
 
 
 def to_dstr(ts):
-    return ts.strftime('%d.%m.%Y')
+    tsn = ts
+    try:
+        tsn = tsn.strftime('%d.%m.%Y')
+    except:
+        pass
+    return tsn
 
 
 def get_list(df_col, as_type='ts'):

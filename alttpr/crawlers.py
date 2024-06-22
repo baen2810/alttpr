@@ -661,7 +661,9 @@ class RacetimeCrawler:
             self.output_path.mkdir(parents=True)
         pprint(f'Exporting data to: {self.output_path}', end='...')
         self.hosts_df[self.hosts_df.host_name.isin(host_names)].to_excel(Path(self.output_path, 'hosts_df.xlsx'), index=False, engine='openpyxl') if 'hosts_df' in dfs else None
-        self.get_df().to_excel(Path(self.output_path, 'races_df.xlsx'), index=False, engine='openpyxl') if 'races_df' in dfs else None
+        df_races = self.get_df()
+        df_races.entrant_finishtime = [to_tstr(f) for f in df_races.entrant_finishtime]
+        df_races.to_excel(Path(self.output_path, 'races_df.xlsx'), index=False, engine='openpyxl') if 'races_df' in dfs else None
         df_metrics = self.metrics_df[['scope', 'forfeits', 'win_filter', 'name', 'aggregation', 'pivoted_by', 'pivot_label', 'metric'] + host_names].dropna(how='all', subset=host_names).astype(str)
         for c in df_metrics.columns:
             df_metrics[c] = [d.replace('NaT', '').replace('nan', '').replace('0 days ', '') for d in df_metrics[c]]
