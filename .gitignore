@@ -1,10 +1,12 @@
 # venv
-venv/
+.venv/
+.venv_tst/
 # Logfiles
 logs/
 tests/data/temp_data/
 scripts/
 export/
+input/
 __pycache__/
 .ipynb_checkpoints/
 alttpr_crawler.py
