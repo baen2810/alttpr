@@ -94,9 +94,44 @@ DEFAULT_DARKWORLD_MAP_BOX = (1670, 229, 249, 260)
 # default tracking point coordinates for the itemtracker box
 # absolute pixels relative to top left corner of box
 DEFAULT_ITEMTRACKER_POINTS = {
-    'BOW': (88, 16),
-    'BRG': (124, 16),
-    'HS': (156, 25)
+    # itemtracker row 1
+    # '01|SWO': (200, 200),
+    # '02|BMR': (124, 16),
+    # '03|BOW': (88, 16),
+    '04|HKS': (156, 25),
+    '05|BMB': (200, 200),
+    '06|MSR': (200, 200),
+    '07|POW': (200, 200),
+    # # itemtracker row 2
+    # '11|MNP': (200, 200),
+    # '12|FIR': (200, 200),
+    # '13|ICR': (200, 200),
+    # '14|BBS': (200, 200),
+    # '15|ETH': (200, 200),
+    # '16|QUK': (200, 200),
+    # # itemtracker row 3
+    # '21|EP': (200, 200),
+    # '22|LMP': (200, 200),
+    # '23|HMR': (200, 200),
+    # '24|SVL': (200, 200),
+    # '25|FLU': (200, 200),
+    # '26|BUG': (200, 200),
+    # '27|BOK': (200, 200),
+    # # itemtracker row 4
+    # '31|DP': (200, 200),
+    # '32|BTL': (200, 200),
+    # '33|SOM': (200, 200),
+    # '34|BYR': (200, 200),
+    # '35|CAP': (200, 200),
+    # '36|MIR': (200, 200),
+    # # itemtracker row 5
+    # '41|TH': (200, 200),
+    # '42|BTS': (200, 200),
+    # '43|GLV': (200, 200),
+    # '44|FLP': (200, 200),
+    # '45|MAG': (200, 200),
+    # '46|AG1': (200, 200),
+    # '47|AG2': (200, 200),
     }
 
 # default tracking point coordinates for the lightworld map tracker box
@@ -117,7 +152,7 @@ DEFAULT_DARKWORLD_MAP_POINTS = {
 
 # Define the predefined RGB values for each color label
 DEFAULT_COLOR_LABELS_MAP_TRACKERS = {
-    'default': {
+    'DEFAULT': {
         'RED': (230, 0, 0),
         'GREEN': (20, 255, 20),
         'LIGHTBLUE': (40, 180, 240),
@@ -136,21 +171,17 @@ DEFAULT_COLOR_LABELS_ITEM_TRACKER = {
     'SWORD|FIGHTER': (0, 0, 240),
     'SWORD|MASTER': (240, 160, 20),
     'SWORD|TEMPERED': (245, 255, 15),
-    'BOW|NONE': (128, 128, 128),
-    'BOW|BASIC': (128, 128, 128),
-    'BOW|SILVERS': (128, 128, 128),
     'BOW': {
-        'ON': (255, 0, 0),
-        'OFF': (0, 255, 0),
+        'FALSE': (0, 0, 0),
+        'SIMPLE': (255, 0, 0),
+        'SILVERS': (0, 255, 0),
     },
-    'default': {
-        'red': (255, 0, 0),
-        'green': (0, 255, 0),
-        'light blue': (173, 216, 230),
-        'dark blue': (0, 0, 139),
-        'orange': (255, 165, 0),
-        'yellow': (255, 255, 0),
-        'grey': (128, 128, 128)
+    'HKS': {
+        'FALSE': (0, 0, 0),  # black
+        'TRUE': (230, 0, 0),  # red
+    },
+    'DEFAULT': {
+        'CLF_ERR': (0, 0, 0),
     }
 }
 
@@ -320,7 +351,7 @@ class DunkaScanner:
     def select_box(video_path: Union[str, Path], timestamp: pd.Timedelta, title: str = 'Select Box',
                 step_size_horizontal: float = 0.01, step_size_vertical: float = 0.01,
                 default_box: Tuple[int, int, int, int] = (800, 100, 200, 200),
-                tracking_points: dict = None) -> Optional[Tuple[Tuple[int, int, int, int], dict]]:
+                tracking_points: Dict[str, Tuple[int, int]] = None) -> Optional[Tuple[Tuple[int, int, int, int], Dict[str, Tuple[int, int]]]]:
         """
         Allow the user to select a rectangular area on a reference frame from the video.
         Returns the selected rectangle as (x, y, width, height) or None if aborted.
@@ -329,10 +360,10 @@ class DunkaScanner:
         - video_path: Path to the input video file.
         - timestamp: Timestamp to seek the reference frame.
         - title: Title of the window.
-        - step_size_horizontal: Step size for horizontal movement in pixels.
-        - step_size_vertical: Step size for vertical movement in pixels.
+        - step_size_horizontal: Step size for horizontal movement as a percentage of rectangle width.
+        - step_size_vertical: Step size for vertical movement as a percentage of rectangle height.
         - default_box: Default box coordinates (x, y, width, height).
-        - tracking_points: Dictionary with labels as keys and (x, y) tuples as values, specifying points within the box.
+        - tracking_points: Dictionary of point names and their coordinates within the box.
         """
         cap = cv2.VideoCapture(str(video_path))
 
@@ -347,36 +378,35 @@ class DunkaScanner:
             raise ValueError("Error: Could not read frame.")
 
         frame_height, frame_width = frame.shape[:2]
-        x, y, w, h = default_box  # Initial position and size of the rectangle
+        x, y, w, h = default_box
+        points = tracking_points or {}
 
         step_size_horizontal = 0.0  # Default to 0%, which is one pixel
         step_size_vertical = 0.0  # Default to 0%, which is one pixel
 
-        if tracking_points is None:
-            tracking_points = {}
+        selected_point_name = None
+        point_names = list(points.keys())
+        point_index = 0 if point_names else -1
 
-        point_labels = list(tracking_points.keys())
-        selected_point_index = 0 if point_labels else -1
-
-        window_title = title + " (e: confirm, q: quit, w: up, s: down, a: left, d: right, r: increase height, f: decrease height, c: increase width, x: decrease width, t: increase step, g: decrease step, i: move point up, k: move point down, j: move point left, l: move point right, u: previous point, o: next point)"
+        window_title = title + " (e: confirm, q: quit, w: up, s: down, a: left, d: right, r: increase height, f: decrease height, c: increase width, x: decrease width, t: increase step, g: decrease step, i: point up, k: point down, j: point left, l: point right, u: previous point, o: next point)"
 
         while True:
             temp_frame = frame.copy()
             cv2.rectangle(temp_frame, (int(x), int(y)), (int(x + w), int(y + h)), (0, 0, 255), 1)
-            
-            for label, (px, py) in tracking_points.items():
+
+            if point_index >= 0:
+                selected_point_name = point_names[point_index]
+                cv2.putText(temp_frame, f"Selected Point: {selected_point_name}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
+            step_size_text = f"Step size: {int(step_size_horizontal * 100)}%"
+            cv2.putText(temp_frame, step_size_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+
+            for point_name, (px, py) in points.items():
                 point_x = int(x + px)
                 point_y = int(y + py)
                 cv2.circle(temp_frame, (point_x, point_y), 2, (255, 255, 255), -1)
-                cv2.putText(temp_frame, label, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.putText(temp_frame, point_name, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
-            if selected_point_index >= 0:
-                selected_point_label = point_labels[selected_point_index]
-                selected_point_coords = tracking_points[selected_point_label]
-                cv2.putText(temp_frame, f"Selected point: {selected_point_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            
-            step_size_text = f"Step size: {int(step_size_horizontal * 100)}%"
-            cv2.putText(temp_frame, step_size_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
             cv2.imshow(window_title, temp_frame)
 
             key = cv2.waitKey(0) & 0xFF
@@ -395,35 +425,39 @@ class DunkaScanner:
             elif key == ord('d'):
                 x = min(frame_width - w, x + horizontal_step)
             elif key == ord('r'):
+                scale_factor = (h + vertical_step) / h
                 h = min(frame_height - y, h + vertical_step)
+                points = {k: (px, py * scale_factor) for k, (px, py) in points.items()}
             elif key == ord('f'):
+                scale_factor = (h - vertical_step) / h
                 h = max(1, h - vertical_step)
+                points = {k: (px, py * scale_factor) for k, (px, py) in points.items()}
             elif key == ord('c'):
+                scale_factor = (w + horizontal_step) / w
                 w = min(frame_width - x, w + horizontal_step)
+                points = {k: (px * scale_factor, py) for k, (px, py) in points.items()}
             elif key == ord('x'):
+                scale_factor = (w - horizontal_step) / w
                 w = max(1, w - horizontal_step)
+                points = {k: (px * scale_factor, py) for k, (px, py) in points.items()}
             elif key == ord('t'):
                 step_size_horizontal = min(1.0, step_size_horizontal + 0.1)
                 step_size_vertical = min(1.0, step_size_vertical + 0.1)
             elif key == ord('g'):
                 step_size_horizontal = max(0.0, step_size_horizontal - 0.1)
                 step_size_vertical = max(0.0, step_size_vertical - 0.1)
-            elif key == ord('i') and selected_point_index >= 0:
-                label = point_labels[selected_point_index]
-                tracking_points[label] = (tracking_points[label][0], max(0, tracking_points[label][1] - vertical_step))
-            elif key == ord('k') and selected_point_index >= 0:
-                label = point_labels[selected_point_index]
-                tracking_points[label] = (tracking_points[label][0], min(h, tracking_points[label][1] + vertical_step))
-            elif key == ord('j') and selected_point_index >= 0:
-                label = point_labels[selected_point_index]
-                tracking_points[label] = (max(0, tracking_points[label][0] - horizontal_step), tracking_points[label][1])
-            elif key == ord('l') and selected_point_index >= 0:
-                label = point_labels[selected_point_index]
-                tracking_points[label] = (min(w, tracking_points[label][0] + horizontal_step), tracking_points[label][1])
-            elif key == ord('u') and point_labels:
-                selected_point_index = (selected_point_index - 1) % len(point_labels)
-            elif key == ord('o') and point_labels:
-                selected_point_index = (selected_point_index + 1) % len(point_labels)
+            elif key == ord('i') and point_index >= 0:
+                points[selected_point_name] = (points[selected_point_name][0], max(0, points[selected_point_name][1] - vertical_step))
+            elif key == ord('k') and point_index >= 0:
+                points[selected_point_name] = (points[selected_point_name][0], min(h, points[selected_point_name][1] + vertical_step))
+            elif key == ord('j') and point_index >= 0:
+                points[selected_point_name] = (max(0, points[selected_point_name][0] - horizontal_step), points[selected_point_name][1])
+            elif key == ord('l') and point_index >= 0:
+                points[selected_point_name] = (min(w, points[selected_point_name][0] + horizontal_step), points[selected_point_name][1])
+            elif key == ord('u') and point_names:
+                point_index = (point_index - 1) % len(point_names)
+            elif key == ord('o') and point_names:
+                point_index = (point_index + 1) % len(point_names)
             elif key == ord('q'):
                 cap.release()
                 cv2.destroyAllWindows()
@@ -434,9 +468,9 @@ class DunkaScanner:
         cv2.destroyAllWindows()
 
         selected_box = (x, y, w, h)
-        pprint(f'{title} (Box): {selected_box}')
-        pprint(f'{title} (Points): {tracking_points}')
-        return selected_box, tracking_points
+        pprint(f'{title} box: {selected_box}')
+        pprint(f'{title} points: {points}')
+        return selected_box, points
 
     def _convert_to_timedelta(self, time: Union[int, str, pd.Timestamp, pd.Timedelta]) -> pd.Timedelta:
         if isinstance(time, int):
