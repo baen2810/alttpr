@@ -95,56 +95,118 @@ DEFAULT_DARKWORLD_MAP_BOX = (1670, 229, 249, 260)
 # absolute pixels relative to top left corner of box
 DEFAULT_ITEMTRACKER_POINTS = {
     # itemtracker row 1
-    # '01|SWO': (200, 200),
-    # '02|BMR': (124, 16),
-    # '03|BOW': (88, 16),
-    # '04|HKS': (156, 25),
-    # '05|BMB': (193, 20),
-    # '06|MSR': (218, 6),
-    # '07|POW': (237, 22),
-    # # itemtracker row 2
-    # '11|MNP': (55, 50),
-    # '12|FIR': (86, 53),
-    # '13|ICR': (121, 53),
-    # '14|BBS': (148, 46),
-    # '15|ETH': (187, 55),
-    # '16|QUK': (228, 55),
-    # # itemtracker row 3
-    # '21|EP': (15, 72),
-    # '22|LMP': (89, 85),
-    # '23|HMR': (122, 78),
-    # '24|SVL': (148, 70),
-    # '25|FLU': (164, 89),
-    # '26|BUG': (190, 73),
-    # '27|BOK': (229, 92),
-    # # itemtracker row 4
-    # '31|DP': (7, 119),
-    # '32|BTL': (89, 113),
-    # '33|SOM': (122, 120),
-    # '34|BYR': (157, 120),
-    # '35|CAP': (188, 118),
-    # '36|MIR': (227, 106),
-    # # itemtracker row 5
-    '41|TH': (9, 156),
-    '42|BTS': (80, 154),
-    '43|GLV': (114, 150),
-    '44|FLP': (163, 143),
-    '45|MAG': (183, 158),
-    '46|AG1': (219, 132),
-    '47|AG2': (236, 151),
+    '11|SWO': (200, 200),
+    '12|BMR': (124, 16),
+    '13|BOW': (88, 16),
+    '14|HKS': (156, 25),
+    '15|BMB': (193, 20),
+    '16|MSR': (218, 6),
+    '17|POW': (237, 22),
+    # itemtracker row 2
+    '21|MNP': (55, 50),
+    '22|FIR': (86, 53),
+    '23|ICR': (121, 53),
+    '24|BBS': (148, 46),
+    '25|ETH': (187, 55),
+    '26|QUK': (228, 55),
+    # itemtracker row 3
+    '31|EP': (15, 72),
+    '32|LMP': (89, 85),
+    '33|HMR': (122, 78),
+    '34|SVL': (148, 70),
+    '35|FLU': (164, 89),
+    '36|BGN': (190, 73),
+    '37|BOK': (229, 92),
+    # itemtracker row 4
+    '41|DP': (7, 119),
+    '42|BTL': (89, 113),
+    '43|SOM': (122, 120),
+    '44|BYR': (157, 120),
+    '45|CAP': (188, 118),
+    '46|MIR': (227, 106),
+    # itemtracker row 5
+    '51|TH': (9, 156),
+    '52|BTS': (80, 154),
+    '53|GLV': (114, 150),
+    '54|FLP': (163, 143),
+    '55|MAG': (183, 158),
+    '56|AG1': (219, 132),
+    '57|AG2': (236, 151),
     }
 
 # default tracking point coordinates for the lightworld map tracker box
 # absolute pixels relative to top left corner of box
 DEFAULT_LIGHTWORLD_MAP_POINTS = {
-    'P1': (13, 7),
-    'P2': (31, 22),
-    'P3': (47, 33)
+    # lost woods & countryside
+    '111|PED': (13, 7),
+    '112|SHROOM': (31, 22),
+    '113|HIDEOUT': (47, 33),
+    '114|TREE': (47, 33),
+    '115|FROG': (100, 50),
+    '116|MADBATTER': (100, 50),
+    '117|BURIEDITEM': (100, 50),
+    # kakariko
+    '121|HUT': (100, 50),
+    '122|WELL': (100, 50),
+    '123|VENDOR': (100, 50),
+    '124|CHICKEN': (100, 50),
+    '125|KID': (100, 50),
+    '126|TAVERN': (100, 50),
+    '127|LIBRARY': (100, 50),
+    '128|RACE': (100, 50),
+    # south route and water checks
+    '131|HOME': (100, 100),
+    '132|DRAIN': (100, 100),
+    '133|MMOLDCAVE': (100, 100),
+    '134|IRCAVE': (100, 100),
+    '135|LAKE': (100, 100),
+    '136|WATERFALL': (100, 100),
+    '137|ZORA': (100, 100),
+    '138|ZORALEDGE': (100, 100),
+    '139|BRIDGE': (100, 100),
+    # eastern palace area
+    '141|EP_DUNGEON': (100, 100),
+    '142|EP_BOSS': (100, 100),
+    '143|SAHAS': (100, 100),
+    '144|SAHASCAVE': (100, 100),
+    '145|WITCH': (100, 100),
+    # desert palace area
+    '151|DP_DUNGEON': (100, 100),
+    '152|DP_BOSS': (100, 100),
+    '153|DP_LEDGE': (100, 100),
+    '154|DP_TABLET': (100, 100),
+    '155|CHECKERBOARD': (100, 100),
+    '156|AGINA': (100, 100),
+    '157|CAVE45': (100, 100),
+    # north route
+    '161|BONK': (100, 100),
+    '162|SANCTUARY': (100, 100),
+    '163|GRAVE_LEDGE': (100, 100),
+    '164|KINGSTOMB': (100, 100),
+    # hyrule castle
+    '171|AGA': (100, 100),
+    '172|UNCLE': (100, 100),
+    '173|DUNGEON': (100, 100),
+    '174|DARKCROSS': (100, 100),
+    '175|SEWERS': (100, 100),
+    # mountain left
+    '181|TH_DUNGEON': (100, 100),
+    '182|TH_BOSS': (100, 100),
+    '183|TH_TABLET': (100, 100),
+    '184|OLDMAN': (100, 100),
+    '185|SPECTCAVE': (100, 100),
+    '186|SPECT_LEDGE': (100, 100),
+    # mountain right
+    '191|PARADOX': (100, 100),
+    '192|SPIRAL': (100, 100),
+    '193|FLOATING': (100, 100),
+    '194|MIMIC': (100, 100),
     }
 
 # default tracking point coordinates for the darkworld map tracker box
 # absolute pixels relative to top left corner of box
 DEFAULT_DARKWORLD_MAP_POINTS = {
+    # xx
     'P1': (6, 6),
     'P2': (83, 39),
     'P3': (142, 39)
@@ -159,18 +221,19 @@ DEFAULT_COLOR_LABELS_MAP_TRACKERS = {
         'DARKBLUE': (0, 0, 240),
         'ORANGE': (240, 160, 20),
         'YELLOW': (245, 255, 15),
-        'GREY': (128, 128, 128)
+        'GREY': (128, 128, 128),
+        'PURPLE': (128, 0, 128),
     },
 }
 
 # Define the predefined RGB values for each item tracker label
 DEFAULT_COLOR_LABELS_ITEM_TRACKER = {
-    'HS|NONE': (230, 0, 0),
-    'HS|ACTIVE': (20, 255, 20),
-    'SWORD|NONE': (40, 180, 240),
-    'SWORD|FIGHTER': (0, 0, 240),
-    'SWORD|MASTER': (240, 160, 20),
-    'SWORD|TEMPERED': (245, 255, 15),
+    'SWORD': {
+        'FALSE': (0, 0, 0),
+        'FIGHTER': (255, 0, 0),
+        'MASTER': (0, 255, 0),
+        'TEMPERED': (0, 255, 0),
+    },
     'BOW': {
         'FALSE': (0, 0, 0),
         'SIMPLE': (255, 0, 0),
@@ -181,7 +244,8 @@ DEFAULT_COLOR_LABELS_ITEM_TRACKER = {
         'TRUE': (230, 0, 0),  # red
     },
     'DEFAULT': {
-        'CLF_ERR': (0, 0, 0),
+        'OFF': (62, 62, 62),
+        'ON': (248, 248, 248),
     }
 }
 
@@ -381,14 +445,18 @@ class DunkaScanner:
         x, y, w, h = default_box
         points = tracking_points or {}
 
-        step_size_horizontal = 0.0  # Default to 0%, which is one pixel
-        step_size_vertical = 0.0  # Default to 0%, which is one pixel
+        step_size_horizontal = 0.01  # Default to 1%
+        step_size_vertical = 0.01  # Default to 1%
 
         selected_point_name = None
         point_names = list(points.keys())
         point_index = 0 if point_names else -1
+        label_display_mode = 'ID'
 
-        window_title = title + " (e: confirm, q: quit, w: up, s: down, a: left, d: right, r: increase height, f: decrease height, c: increase width, x: decrease width, t: increase step, g: decrease step, i: point up, k: point down, j: point left, l: point right, u: previous point, o: next point)"
+        window_title = title + " (e: confirm, q: quit, w: up, s: down, a: left, d: right, r: increase height, f: decrease height, c: increase width, x: decrease width, t: increase step, g: decrease step, i: point up, k: point down, j: point left, l: point right, u: previous point, o: next point, b: forward 15 min, v: back 15 min, p: toggle label, y: save to file)"
+        keybindings_text = ["Keybindings: e: confirm, q: quit, w: up, s: down, a: left, d: right, r: increase height, f: decrease height",
+                            "c: increase width, x: decrease width, t: increase step, g: decrease step, i: point up, k: point down",
+                            "j: point left, l: point right, u: previous point, o: next point, b: forward 15 min, v: back 15 min, p: toggle label, y: save to file"]
 
         while True:
             temp_frame = frame.copy()
@@ -401,11 +469,41 @@ class DunkaScanner:
             step_size_text = f"Step size: {int(step_size_horizontal * 100)}%"
             cv2.putText(temp_frame, step_size_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
+            frame_data = []
             for point_name, (px, py) in points.items():
                 point_x = int(x + px)
                 point_y = int(y + py)
                 cv2.circle(temp_frame, (point_x, point_y), 2, (255, 255, 255), -1)
-                cv2.putText(temp_frame, point_name, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+
+                # Determine the label to display based on the display mode
+                if label_display_mode == 'None':
+                    label = ''
+                elif label_display_mode == 'ID':
+                    label = point_name.split('|')[0]
+                else:
+                    label = point_name
+
+                cv2.putText(temp_frame, label, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+
+                B, G, R = frame[point_y, point_x]
+                frame_data.append({
+                    "tracker_name": "Tracker",
+                    "R": R,
+                    "G": G,
+                    "B": B,
+                    "point_name": point_name,
+                })
+
+            DunkaScanner._draw_table(temp_frame, frame_data, 'center_left')
+
+            # Draw the keybindings text in a white box with black text
+            y_offset = frame_height - 50
+            for keybinding_text in keybindings_text:
+                (text_width, text_height), _ = cv2.getTextSize(keybinding_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+                text_x, text_y = 10, y_offset
+                cv2.rectangle(temp_frame, (text_x - 5, text_y - text_height - 5), (text_x + text_width + 5, text_y + 5), (255, 255, 255), cv2.FILLED)
+                cv2.putText(temp_frame, keybinding_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1, cv2.LINE_AA)
+                y_offset += text_height + 10
 
             cv2.imshow(window_title, temp_frame)
 
@@ -458,6 +556,35 @@ class DunkaScanner:
                 point_index = (point_index - 1) % len(point_names)
             elif key == ord('o') and point_names:
                 point_index = (point_index + 1) % len(point_names)
+            elif key == ord('b'):
+                frame_count = min(frame_count + int(15 * 60 * fps), int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_count)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+            elif key == ord('v'):
+                frame_count = max(0, frame_count - int(15 * 60 * fps))
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_count)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+            elif key == ord('p'):
+                if label_display_mode == 'Full':
+                    label_display_mode = 'ID'
+                elif label_display_mode == 'ID':
+                    label_display_mode = 'None'
+                else:
+                    label_display_mode = 'Full'
+            elif key == ord('y'):
+                save_path = os.path.join(os.getcwd(), 'tracker_box_and_points.txt')
+                with open(save_path, 'w') as f:
+                    f.write(f'{title.replace(" ", "_").upper()}_BOX = {{\n')
+                    f.write(f'    "x": {x},\n    "y": {y},\n    "w": {w},\n    "h": {h}\n}}\n')
+                    f.write(f'{title.replace(" ", "_").upper()}_POINTS = {{\n')
+                    for point_name, coords in points.items():
+                        f.write(f'    "{point_name}": {coords},\n')
+                    f.write('}\n')
+                pprint(f"Saved box and points to {save_path}")
             elif key == ord('q'):
                 cap.release()
                 cv2.destroyAllWindows()
@@ -471,6 +598,7 @@ class DunkaScanner:
         pprint(f'{title} box: {selected_box}')
         pprint(f'{title} points: {points}')
         return selected_box, points
+
 
     def _convert_to_timedelta(self, time: Union[int, str, pd.Timestamp, pd.Timedelta]) -> pd.Timedelta:
         if isinstance(time, int):
@@ -491,59 +619,73 @@ class DunkaScanner:
         else:
             raise ValueError("Unsupported time format")
     
-    def scan(self, table_position: Optional[str] = 'upper left', save_nth_frame: int = 10) -> None:
+    def scan(self, table_position: str = 'upper_left', save_nth_frame: int = 10) -> None:
         """
-        Extract frames from the video, save them as image files, and collect RGB and HSI values for specified points.
+        Extract frames from the video and save them as image files.
         The frames are extracted based on the set parameters and saved in the output folder.
 
         Parameters:
-        - table_position: Optional; position of the table with point names and RGB values. 
-                          Choices: 'lower left', 'lower center', 'lower right', 'upper left', 'upper center', 'upper right', None.
-                          Default is 'upper left'. If None, the table will not be drawn.
-        - save_nth_frame: Optional; save every nth frame. Default is 10. If 1, save every frame.
+        - table_position: Position of the table (default is 'upper_left').
+        - save_nth_frame: Save every nth frame (default is 10).
         """
-        video_name = self.input_video_path.stem
+        # Check and clear output directory
+        video_name = self.input_video_path.stem  # Get the video file name without extension
         frames_output_path = self.output_path / video_name / 'frames'
-        
         self._check_and_delete_existing_output(frames_output_path)
 
+        # Create the output subdirectory for frames
         if not frames_output_path.exists():
             frames_output_path.mkdir(parents=True, exist_ok=True)
 
+        # Open the video file
         cap = cv2.VideoCapture(str(self.input_video_path))
 
+        # Calculate the interval for frame extraction
         interval, frame_indices = self._calculate_frame_extraction_intervals()
 
         data = []
 
-        for i, frame_index in enumerate(tqdm(frame_indices, desc=pprintdesc('Extracting frames'))):
+        for frame_index in tqdm(frame_indices, desc=pprintdesc('Extracting frames')):
+            # Set the position of the next frame to read
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             ret, frame = cap.read()
+
+            # If the frame was not read successfully, break the loop
             if not ret:
                 break
 
+            # Calculate the timestamp for the frame
             frame_time, frame_timestamp = self._calculate_frame_timestamp(frame_index)
+
+            # Extract RGB values for points before overlaying
             frame_data = self._extract_rgb_values(frame, frame_time)
 
+            # Overlay the boxes and points
             self._overlay_boxes_and_points(frame)
 
-            if table_position:
-                self._draw_table(frame, frame_data, table_position)
+            # Draw the table with RGB values
+            self._draw_table(frame, frame_data, table_position)
 
-            if save_nth_frame > 0 and i % save_nth_frame == 0:
-                frame_filename = frames_output_path / f"{frame_timestamp}.jpg"
-                cv2.imwrite(str(frame_filename), frame)
-                self.frames.append(str(frame_filename))
-
+            # Append data for dataframe
             data.extend(frame_data)
 
-        cap.release()
-        
-        self.color_coord_df = pd.DataFrame(data)
-        self.color_coord_df.frame = [str(f)[-8:] for f in self.color_coord_df.frame]
-        self.color_coord_df['start_ts'] = str(self.start_ts)[-8:]
-        self.color_coord_df['end_ts'] = str(self.end_ts)[-8:]
+            # Construct the output file path
+            frame_filename = frames_output_path / f"{frame_timestamp}.jpg"
+            if len(data) % save_nth_frame == 0:
+                cv2.imwrite(str(frame_filename), frame)
 
+            # Add the filename to the list of extracted frames
+            self.frames.append(str(frame_filename))
+
+        # Release the video capture object
+        cap.release()
+
+        # Create the dataframe
+        self.color_coord_df = pd.DataFrame(data, columns=['frame', 'tracker_name', 'point_name', 'R', 'G', 'B', 'H', 'S', 'I'])
+        self.color_coord_df['start_ts'] = self.start_ts
+        self.color_coord_df['end_ts'] = self.end_ts
+
+        # Zip the output directory and clean up
         self._zip_output_folder(frames_output_path)
 
     def _calculate_frame_extraction_intervals(self) -> Tuple[int, range]:
@@ -619,23 +761,54 @@ class DunkaScanner:
                     cv2.circle(frame, (point_x, point_y), 2, (255, 255, 255), -1)
                     cv2.putText(frame, point_name, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
-    def _draw_table(self, frame: np.ndarray, frame_data: List[Dict], table_position: str) -> None:
-        table_positions = {
-            'lower left': (10, frame.shape[0] - 10),
-            'lower center': ((frame.shape[1] - 200) // 2, frame.shape[0] - 10),
-            'lower right': (frame.shape[1] - 210, frame.shape[0] - 10),
-            'upper left': (10, 10),
-            'upper center': ((frame.shape[1] - 200) // 2, 10),
-            'upper right': (frame.shape[1] - 210, 10)
-        }
-        x_base, y_base = table_positions.get(table_position, (10, 10))
+    @staticmethod
+    def _draw_table(frame, frame_data, table_position: str = 'upper_left'):
+        """
+        Draw a table with RGB values on the frame.
+        """
+        table_text = "Tracker  Point Name  R    G    B\n"
+        table_text += "\n".join([f"{item['tracker_name']}  {item['point_name']}  {int(item['R']):3d}  {int(item['G']):3d}  {int(item['B']):3d}"
+                                for item in frame_data])
 
-        table_text = "Tracker    Point    R    G    B    Color\n"
-        table_text += "\n".join([f"{entry['tracker_name']}  {entry['point_name']}  {int(entry['R']):3d}  {int(entry['G']):3d}  {int(entry['B']):3d}  {entry['color_label']}" for entry in frame_data])
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        font_thickness = 1
+        line_height = 15
+
         lines = table_text.split('\n')
 
+        # Determine the position of the table
+        if table_position == 'upper_left':
+            x, y = 10, 10
+        elif table_position == 'upper_center':
+            x, y = frame.shape[1] // 2 - 200, 10
+        elif table_position == 'upper_right':
+            x, y = frame.shape[1] - 400, 10
+        elif table_position == 'lower_left':
+            x, y = 10, frame.shape[0] - (line_height * len(lines)) - 10
+        elif table_position == 'lower_center':
+            x, y = frame.shape[1] // 2 - 200, frame.shape[0] - (line_height * len(lines)) - 10
+        elif table_position == 'lower_right':
+            x, y = frame.shape[1] - 400, frame.shape[0] - (line_height * len(lines)) - 10
+        elif table_position == 'center_left':
+            x, y = 10, frame.shape[0] // 2 - (line_height * len(lines)) // 2
+        elif table_position == 'center':
+            x, y = frame.shape[1] // 2 - 200, frame.shape[0] // 2 - (line_height * len(lines)) // 2
+        elif table_position == 'center_right':
+            x, y = frame.shape[1] - 400, frame.shape[0] // 2 - (line_height * len(lines)) // 2
+        else:
+            return  # Do not draw the table if the position is None
+
+        # Draw the white box
+        box_width = max([cv2.getTextSize(line, font, font_scale, font_thickness)[0][0] for line in lines]) + 10
+        box_height = line_height * len(lines) + 10
+        cv2.rectangle(frame, (x - 5, y - 15), (x + box_width, y + box_height - 15), (255, 255, 255), cv2.FILLED)
+
+        # Draw the table text on the frame
         for i, line in enumerate(lines):
-            cv2.putText(frame, line, (x_base, y_base + i * 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(frame, line, (x, y + i * line_height), font, font_scale, (0, 0, 0), font_thickness, cv2.LINE_AA)
+
+
 
     def _convert_to_timedelta(self, time: Union[int, str, pd.Timestamp, pd.Timedelta]) -> pd.Timedelta:
         if isinstance(time, int):
