@@ -213,7 +213,7 @@ DEFAULT_ITEMTRACKER_POINTS = {
     '14|HKS': (156, 25),
     '15|BMB': (197, 14),
     '16|MSR': (218, 6),
-    '17|POW': (237, 22),
+    '17|POW': (237, 28),
     # itemtracker row 2
     '21|MNP': (55, 50),
     '22|FIR': (86, 53),
@@ -229,7 +229,7 @@ DEFAULT_ITEMTRACKER_POINTS = {
     '35|FLU': (164, 89),
     '36|BGN': (190, 73),
     '37|BOK': (229, 92),
-    '38|SLD': (55, 50),
+    '38|SLD': (11, 50),
     # itemtracker row 4
     '41|DP': (7, 119),
     '42|BTL': (89, 113),
@@ -248,7 +248,7 @@ DEFAULT_ITEMTRACKER_POINTS = {
     # itemtracker row 6
     '61|POD': (16, 182),
     '62|SP': (50, 174),
-    '63|SW': (82, 176),
+    '63|SW': (82, 180),
     '64|TT': (115, 183),
     '65|IP': (155, 180),
     '66|MM': (195, 168),

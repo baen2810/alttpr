@@ -319,7 +319,11 @@ class DunkaScanner:
                 cv2.putText(temp_frame, label, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
                 B, G, R = frame[point_y, point_x]
-                color_label = DunkaScanner._classify_RGB_into_color_labels(point_name, R, G, B, DEFAULT_COLOR_LABELS_MAP_TRACKERS)
+                if point_name in DEFAULT_COLOR_LABELS_ITEM_TRACKER.keys():  # TODO this may break when not all items are explicit keys but use default instead
+                    color_labels = DEFAULT_COLOR_LABELS_ITEM_TRACKER
+                else:
+                    color_labels = DEFAULT_COLOR_LABELS_MAP_TRACKERS
+                color_label = DunkaScanner._classify_RGB_into_color_labels(point_name, R, G, B, color_labels)
                 frame_data.append({
                     "tracker_name": "Tracker",
                     "R": R,
