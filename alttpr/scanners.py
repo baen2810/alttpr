@@ -41,7 +41,7 @@ from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path
 from tqdm import trange, tqdm
 from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str, to_tstr, to_dstr
-
+from alttpr.configs import DEFAULT_COLOR_LABELS_MAP_TRACKERS, DEFAULT_COLOR_LABELS_ITEM_TRACKER
 # import base64
 # import io
 # import re
@@ -81,173 +81,6 @@ import cv2
 import pandas as pd
 from tqdm import tqdm
 from alttpr.utils import pprintdesc
-
-# default coordinates for the itemtracker box
-DEFAULT_ITEMTRACKER_BOX = (1418, 0, 245, 224)
-
-# default coordinates for the lightworld map tracker box
-DEFAULT_LIGHTWORLD_MAP_BOX = (1413, 229, 251, 261)
-
-# default coordinates for the darkworld map tracker box
-DEFAULT_DARKWORLD_MAP_BOX = (1670, 229, 249, 260)
-
-# default tracking point coordinates for the itemtracker box
-# absolute pixels relative to top left corner of box
-DEFAULT_ITEMTRACKER_POINTS = {
-    # itemtracker row 1
-    '11|SWO': (200, 200),
-    '12|BMR': (124, 16),
-    '13|BOW': (88, 16),
-    '14|HKS': (156, 25),
-    '15|BMB': (193, 20),
-    '16|MSR': (218, 6),
-    '17|POW': (237, 22),
-    # itemtracker row 2
-    '21|MNP': (55, 50),
-    '22|FIR': (86, 53),
-    '23|ICR': (121, 53),
-    '24|BBS': (148, 46),
-    '25|ETH': (187, 55),
-    '26|QUK': (228, 55),
-    # itemtracker row 3
-    '31|EP': (15, 72),
-    '32|LMP': (89, 85),
-    '33|HMR': (122, 78),
-    '34|SVL': (148, 70),
-    '35|FLU': (164, 89),
-    '36|BGN': (190, 73),
-    '37|BOK': (229, 92),
-    # itemtracker row 4
-    '41|DP': (7, 119),
-    '42|BTL': (89, 113),
-    '43|SOM': (122, 120),
-    '44|BYR': (157, 120),
-    '45|CAP': (188, 118),
-    '46|MIR': (227, 106),
-    # itemtracker row 5
-    '51|TH': (9, 156),
-    '52|BTS': (80, 154),
-    '53|GLV': (114, 150),
-    '54|FLP': (163, 143),
-    '55|MAG': (183, 158),
-    '56|AG1': (219, 132),
-    '57|AG2': (236, 151),
-    }
-
-# default tracking point coordinates for the lightworld map tracker box
-# absolute pixels relative to top left corner of box
-DEFAULT_LIGHTWORLD_MAP_POINTS = {
-    # lost woods & countryside
-    '111|PED': (13, 7),
-    '112|SHROOM': (31, 22),
-    '113|HIDEOUT': (47, 33),
-    '114|TREE': (47, 33),
-    '115|FROG': (100, 50),
-    '116|MADBATTER': (100, 50),
-    '117|BURIEDITEM': (100, 50),
-    # kakariko
-    '121|HUT': (100, 50),
-    '122|WELL': (100, 50),
-    '123|VENDOR': (100, 50),
-    '124|CHICKEN': (100, 50),
-    '125|KID': (100, 50),
-    '126|TAVERN': (100, 50),
-    '127|LIBRARY': (100, 50),
-    '128|RACE': (100, 50),
-    # south route and water checks
-    '131|HOME': (100, 100),
-    '132|DRAIN': (100, 100),
-    '133|MMOLDCAVE': (100, 100),
-    '134|IRCAVE': (100, 100),
-    '135|LAKE': (100, 100),
-    '136|WATERFALL': (100, 100),
-    '137|ZORA': (100, 100),
-    '138|ZORALEDGE': (100, 100),
-    '139|BRIDGE': (100, 100),
-    # eastern palace area
-    '141|EP_DUNGEON': (100, 100),
-    '142|EP_BOSS': (100, 100),
-    '143|SAHAS': (100, 100),
-    '144|SAHASCAVE': (100, 100),
-    '145|WITCH': (100, 100),
-    # desert palace area
-    '151|DP_DUNGEON': (100, 100),
-    '152|DP_BOSS': (100, 100),
-    '153|DP_LEDGE': (100, 100),
-    '154|DP_TABLET': (100, 100),
-    '155|CHECKERBOARD': (100, 100),
-    '156|AGINA': (100, 100),
-    '157|CAVE45': (100, 100),
-    # north route
-    '161|BONK': (100, 100),
-    '162|SANCTUARY': (100, 100),
-    '163|GRAVE_LEDGE': (100, 100),
-    '164|KINGSTOMB': (100, 100),
-    # hyrule castle
-    '171|AGA': (100, 100),
-    '172|UNCLE': (100, 100),
-    '173|DUNGEON': (100, 100),
-    '174|DARKCROSS': (100, 100),
-    '175|SEWERS': (100, 100),
-    # mountain left
-    '181|TH_DUNGEON': (100, 100),
-    '182|TH_BOSS': (100, 100),
-    '183|TH_TABLET': (100, 100),
-    '184|OLDMAN': (100, 100),
-    '185|SPECTCAVE': (100, 100),
-    '186|SPECT_LEDGE': (100, 100),
-    # mountain right
-    '191|PARADOX': (100, 100),
-    '192|SPIRAL': (100, 100),
-    '193|FLOATING': (100, 100),
-    '194|MIMIC': (100, 100),
-    }
-
-# default tracking point coordinates for the darkworld map tracker box
-# absolute pixels relative to top left corner of box
-DEFAULT_DARKWORLD_MAP_POINTS = {
-    # xx
-    'P1': (6, 6),
-    'P2': (83, 39),
-    'P3': (142, 39)
-    }
-
-# Define the predefined RGB values for each color label
-DEFAULT_COLOR_LABELS_MAP_TRACKERS = {
-    'DEFAULT': {
-        'RED': (230, 0, 0),
-        'GREEN': (20, 255, 20),
-        'LIGHTBLUE': (40, 180, 240),
-        'DARKBLUE': (0, 0, 240),
-        'ORANGE': (240, 160, 20),
-        'YELLOW': (245, 255, 15),
-        'GREY': (128, 128, 128),
-        'PURPLE': (128, 0, 128),
-    },
-}
-
-# Define the predefined RGB values for each item tracker label
-DEFAULT_COLOR_LABELS_ITEM_TRACKER = {
-    'SWORD': {
-        'FALSE': (0, 0, 0),
-        'FIGHTER': (255, 0, 0),
-        'MASTER': (0, 255, 0),
-        'TEMPERED': (0, 255, 0),
-    },
-    'BOW': {
-        'FALSE': (0, 0, 0),
-        'SIMPLE': (255, 0, 0),
-        'SILVERS': (0, 255, 0),
-    },
-    'HKS': {
-        'FALSE': (0, 0, 0),  # black
-        'TRUE': (230, 0, 0),  # red
-    },
-    'DEFAULT': {
-        'OFF': (62, 62, 62),
-        'ON': (248, 248, 248),
-    }
-}
 
 class DunkaScanner:
     def __init__(self, input_video_path: Union[str, Path], output_path: Union[str, Path], 
@@ -486,18 +319,7 @@ class DunkaScanner:
                 cv2.putText(temp_frame, label, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
                 B, G, R = frame[point_y, point_x]
-                I = (R + G + B) / 3
-                S = 1 - min(R, G, B) / I if I > 0 else 0
-                H = 0
-                if S != 0:
-                    R_prime = R / (R + G + B)
-                    G_prime = G / (R + G + B)
-                    B_prime = B / (R + G + B)
-                    H = 0.5 * ((R_prime - G_prime) + (R_prime - B_prime)) / ((R_prime - G_prime)**2 + (R_prime - B_prime) * (G_prime - B_prime))**0.5
-                    H = np.degrees(np.arccos(H))
-                    if B > G:
-                        H = 360 - H
-                color_label = DunkaScanner._classify_RGB_into_color_labels(point_name, R, G, B, H, S, I, DEFAULT_COLOR_LABELS_MAP_TRACKERS)
+                color_label = DunkaScanner._classify_RGB_into_color_labels(point_name, R, G, B, DEFAULT_COLOR_LABELS_MAP_TRACKERS)
                 frame_data.append({
                     "tracker_name": "Tracker",
                     "R": R,
@@ -675,8 +497,16 @@ class DunkaScanner:
             # Overlay the boxes and points
             self._overlay_boxes_and_points(frame)
 
-            # Draw the table with RGB values
-            self._draw_table(frame, frame_data, table_position)
+            # Draw the tables with RGB values
+            
+            self._draw_table(frame, frame_data, table_position,
+                             font_scale=0.25, line_height=8)
+            # for t, p in zip(['LW', 'DW', 'IT'], ['left_bottom', 'mid_bottom', 'right_bottom']):
+            #     frame_data_tmp = []
+            #     for i in range(len(frame_data)):
+            #         if frame_data[i]['tracker_name'] == t:
+            #             frame_data_tmp += [frame_data[i]]
+            #     self._draw_table(frame, frame_data_tmp, p)
 
             # Append data for dataframe
             data.extend(frame_data)
@@ -693,7 +523,7 @@ class DunkaScanner:
         cap.release()
 
         # Create the dataframe
-        self.color_coord_df = pd.DataFrame(data, columns=['frame', 'tracker_name', 'point_name', 'R', 'G', 'B', 'H', 'S', 'I', 'label'])
+        self.color_coord_df = pd.DataFrame(data, columns=['frame', 'tracker_name', 'point_name', 'R', 'G', 'B', 'label'])
         self.color_coord_df['start_ts'] = self.start_ts
         self.color_coord_df['end_ts'] = self.end_ts
 
@@ -731,34 +561,19 @@ class DunkaScanner:
                     point_y = int(y + py)
                     B, G, R = frame[point_y, point_x].astype(float)
                     B, G, R = np.clip([B, G, R], 0, 255)  # Ensure values are within [0, 255]
-                    I = (R + G + B) / 3
-                    S = 1 - min(R, G, B) / I if I > 0 else 0
-                    H = 0
-                    if S != 0:
-                        R_prime = R / (R + G + B)
-                        G_prime = G / (R + G + B)
-                        B_prime = B / (R + G + B)
-                        H = 0.5 * ((R_prime - G_prime) + (R_prime - B_prime)) / ((R_prime - G_prime)**2 + (R_prime - B_prime) * (G_prime - B_prime))**0.5
-                        H = np.degrees(np.arccos(H))
-                        if B > G:
-                            H = 360 - H
-                    color_label = self._classify_RGB_into_color_labels(point_name, R, G, B, H, S, I, color_labels)
+                    color_label = self._classify_RGB_into_color_labels(point_name, R, G, B, color_labels)
                     data.append({
                         'frame': frame_time,
                         'point_name': point_name,
                         'R': R,
                         'G': G,
                         'B': B,
-                        'H': H,
-                        'S': S,
-                        'I': I,
                         'tracker_name': tracker_name,
                         'label': color_label
                     })
         return data
 
-
-    def _overlay_boxes_and_points(self, frame: np.ndarray) -> None:
+    def _overlay_boxes_and_points(self, frame: np.ndarray, labels: bool = False) -> None:
         for box, points, label in [
             (self.itemtracker_box, self.itemtracker_points, "IT"),
             (self.lightworld_map_box, self.lightworld_map_tracker_points, "LW"),
@@ -773,57 +588,12 @@ class DunkaScanner:
                     point_x = int(x + px)
                     point_y = int(y + py)
                     cv2.circle(frame, (point_x, point_y), 2, (255, 255, 255), -1)
-                    cv2.putText(frame, point_name, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
-
-    # @staticmethod
-    # def _draw_table(frame, frame_data, table_position: str = 'upper_left'):
-    #     """
-    #     Draw a table with RGB values on the frame.
-    #     """
-    #     table_text = "Tracker  Point Name  R    G    B    Label\n"
-    #     table_text += "\n".join([f"{item['tracker_name']}  {item['point_name']}  {int(item['R']):3d}  {int(item['G']):3d}  {int(item['B']):3d}  {item['label']}"
-    #                             for item in frame_data])
-
-    #     font = cv2.FONT_HERSHEY_SIMPLEX
-    #     font_scale = 0.5
-    #     font_thickness = 1
-    #     line_height = 15
-
-    #     lines = table_text.split('\n')
-
-    #     # Determine the position of the table
-    #     if table_position == 'upper_left':
-    #         x, y = 10, 10
-    #     elif table_position == 'upper_center':
-    #         x, y = frame.shape[1] // 2 - 200, 10
-    #     elif table_position == 'upper_right':
-    #         x, y = frame.shape[1] - 400, 10
-    #     elif table_position == 'lower_left':
-    #         x, y = 10, frame.shape[0] - (line_height * len(lines)) - 10
-    #     elif table_position == 'lower_center':
-    #         x, y = frame.shape[1] // 2 - 200, frame.shape[0] - (line_height * len(lines)) - 10
-    #     elif table_position == 'lower_right':
-    #         x, y = frame.shape[1] - 400, frame.shape[0] - (line_height * len(lines)) - 10
-    #     elif table_position == 'center_left':
-    #         x, y = 10, frame.shape[0] // 2 - (line_height * len(lines)) // 2
-    #     elif table_position == 'center':
-    #         x, y = frame.shape[1] // 2 - 200, frame.shape[0] // 2 - (line_height * len(lines)) // 2
-    #     elif table_position == 'center_right':
-    #         x, y = frame.shape[1] - 400, frame.shape[0] // 2 - (line_height * len(lines)) // 2
-    #     else:
-    #         return  # Do not draw the table if the position is None
-
-    #     # Draw the white box
-    #     box_width = max([cv2.getTextSize(line, font, font_scale, font_thickness)[0][0] for line in lines]) + 10
-    #     box_height = line_height * len(lines) + 10
-    #     cv2.rectangle(frame, (x - 5, y - 15), (x + box_width, y + box_height - 15), (255, 255, 255), cv2.FILLED)
-
-    #     # Draw the table text on the frame
-    #     for i, line in enumerate(lines):
-    #         cv2.putText(frame, line, (x, y + i * line_height), font, font_scale, (0, 0, 0), font_thickness, cv2.LINE_AA)
+                    if labels:
+                        cv2.putText(frame, point_name, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
     @staticmethod
-    def _draw_table(frame, frame_data, table_position: str = 'upper_left'):
+    def _draw_table(frame, frame_data, table_position: str = 'upper_left',
+                    font_scale: float = 0.5, line_height: int = 15, font_thickness: int = 1):
         """
         Draw a table with RGB values on the frame.
         """
@@ -839,9 +609,6 @@ class DunkaScanner:
             table_text += row_text + "\n"
 
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
-        font_thickness = 1
-        line_height = 15
 
         lines = table_text.split('\n')
 
@@ -897,7 +664,7 @@ class DunkaScanner:
             raise ValueError("Unsupported time format")
 
     @classmethod
-    def _classify_RGB_into_color_labels(cls, point_name: str, R, G, B, H, S, I, color_labels):
+    def _classify_RGB_into_color_labels(cls, point_name: str, R, G, B, color_labels):
         """
         Classify the RGB and/or HSI values of a point into predefined color labels.
 
@@ -945,11 +712,33 @@ class DunkaScanner:
         """
         output_file = self.output_path / self.input_video_path.stem / f"{self.input_video_path.stem}.xlsx"
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-            self.color_coord_df.to_excel(writer, sheet_name='data', index=False)
+            df_color_coord = self.color_coord_df.copy()
+            df_color_coord.frame = [str(s)[-8:] for s in df_color_coord.frame]
+            df_color_coord.start_ts = [str(s)[-8:] for s in df_color_coord.start_ts]
+            df_color_coord.end_ts = [str(s)[-8:] for s in df_color_coord.end_ts]
+            df_color_coord.to_excel(writer, sheet_name='data', index=False)
 
             params = {attr: getattr(self, attr) for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")}
             params_df = pd.DataFrame(list(params.items()), columns=['Attribute', 'Value'])
             params_df.to_excel(writer, sheet_name='params', index=False)
+
+        # Define a function to export a dictionary to a text file
+        def export_dict_to_txt(attr_name, attr_value):
+            txt_file = self.output_path / self.input_video_path.stem / f"{attr_name}.txt"
+            with open(txt_file, 'w') as f:
+                f.write(f"{attr_name.upper()} = {{\n")
+                for key, value in attr_value.items():
+                    f.write(f'    "{key}": {value},\n')
+                f.write('}\n')
+            pprint(f"{attr_name} exported to {txt_file}")
+
+        # Export the specified class attributes to their own text files
+        export_dict_to_txt('itemtracker_box', {"x": self.itemtracker_box[0], "y": self.itemtracker_box[1], "w": self.itemtracker_box[2], "h": self.itemtracker_box[3]})
+        export_dict_to_txt('lightworld_map_box', {"x": self.lightworld_map_box[0], "y": self.lightworld_map_box[1], "w": self.lightworld_map_box[2], "h": self.lightworld_map_box[3]})
+        export_dict_to_txt('darkworld_map_box', {"x": self.darkworld_map_box[0], "y": self.darkworld_map_box[1], "w": self.darkworld_map_box[2], "h": self.darkworld_map_box[3]})
+        export_dict_to_txt('itemtracker_points', self.itemtracker_points)
+        export_dict_to_txt('lightworld_map_tracker_points', self.lightworld_map_tracker_points)
+        export_dict_to_txt('darkworld_map_tracker_points', self.darkworld_map_tracker_points)
 
         pprint(f"Data exported to {output_file}")
     

@@ -1,8 +1,11 @@
-from pathlib import Path
 from alttpr.scanners import DunkaScanner
-from alttpr.scanners import DEFAULT_ITEMTRACKER_POINTS, DEFAULT_LIGHTWORLD_MAP_POINTS, DEFAULT_DARKWORLD_MAP_POINTS
-from alttpr.scanners import DEFAULT_ITEMTRACKER_BOX, DEFAULT_LIGHTWORLD_MAP_BOX, DEFAULT_DARKWORLD_MAP_BOX
-from alttpr.utils import to_tstr, pprint
+from alttpr.configs import DEFAULT_ITEMTRACKER_POINTS as ITEMTRACKER_POINTS
+from alttpr.configs import DEFAULT_LIGHTWORLD_MAP_POINTS as LIGHTWORLD_MAP_POINTS
+from alttpr.configs import DEFAULT_DARKWORLD_MAP_POINTS as DARKWORLD_MAP_POINTS
+from alttpr.configs import DEFAULT_ITEMTRACKER_BOX as ITEMTRACKER_BOX
+from alttpr.configs import DEFAULT_LIGHTWORLD_MAP_BOX as LIGHTWORLD_MAP_BOX
+from alttpr.configs import DEFAULT_DARKWORLD_MAP_BOX as DARKWORLD_MAP_BOX
+from alttpr.utils import pprint
 
 import os
 
@@ -33,8 +36,8 @@ def main():
         video_path, 
         selected_start_time, 
         title=f'Select Item Tracker',
-        default_box=DEFAULT_ITEMTRACKER_BOX,
-        tracking_points=DEFAULT_ITEMTRACKER_POINTS,
+        default_box=ITEMTRACKER_BOX,
+        tracking_points=ITEMTRACKER_POINTS,
     )
     if itemtracker_box is None:
         exit()
@@ -44,8 +47,8 @@ def main():
         video_path, 
         selected_start_time, 
         title=f'Select Light World Map',
-        default_box=DEFAULT_LIGHTWORLD_MAP_BOX,
-        tracking_points=DEFAULT_LIGHTWORLD_MAP_POINTS,
+        default_box=LIGHTWORLD_MAP_BOX,
+        tracking_points=LIGHTWORLD_MAP_POINTS,
     )
     if lightworld_map_box is None:
         exit()
@@ -55,8 +58,8 @@ def main():
         video_path, 
         selected_start_time, 
         title=f'Select Dark World Map',
-        default_box=DEFAULT_DARKWORLD_MAP_BOX,
-        tracking_points=DEFAULT_DARKWORLD_MAP_POINTS,
+        default_box=DARKWORLD_MAP_BOX,
+        tracking_points=DARKWORLD_MAP_POINTS,
     )
     if darkworld_map_box is None:
         exit()
@@ -64,8 +67,8 @@ def main():
     scanner = DunkaScanner(
         input_video_path=video_path,
         output_path=os.path.join(os.getcwd(), "input"),
-        start_ts=selected_start_time,  # Use the selected start time
-        end_ts=selected_end_time,      # Use the selected end time
+        start_ts=selected_start_time,
+        end_ts=selected_end_time,
         frames_per_second=1,
         itemtracker_box=itemtracker_box,
         lightworld_map_box=lightworld_map_box,
