@@ -94,9 +94,9 @@ DEFAULT_DARKWORLD_MAP_BOX = (1670, 229, 249, 260)
 # default tracking point coordinates for the itemtracker box
 # absolute pixels relative to top left corner of box
 DEFAULT_ITEMTRACKER_POINTS = {
-    'P1': (88, 16),
-    'P2': (124, 16),
-    'P3': (156, 25)
+    'BOW': (88, 16),
+    'BRG': (124, 16),
+    'HS': (156, 25)
     }
 
 # default tracking point coordinates for the lightworld map tracker box
@@ -117,13 +117,15 @@ DEFAULT_DARKWORLD_MAP_POINTS = {
 
 # Define the predefined RGB values for each color label
 DEFAULT_COLOR_LABELS_MAP_TRACKERS = {
-    'RED': (230, 0, 0),
-    'GREEN': (20, 255, 20),
-    'LIGHTBLUE': (40, 180, 240),
-    'DARKBLUE': (0, 0, 240),
-    'ORANGE': (240, 160, 20),
-    'YELLOW': (245, 255, 15),
-    'GREY': (128, 128, 128)
+    'default': {
+        'RED': (230, 0, 0),
+        'GREEN': (20, 255, 20),
+        'LIGHTBLUE': (40, 180, 240),
+        'DARKBLUE': (0, 0, 240),
+        'ORANGE': (240, 160, 20),
+        'YELLOW': (245, 255, 15),
+        'GREY': (128, 128, 128)
+    },
 }
 
 # Define the predefined RGB values for each item tracker label
@@ -137,6 +139,19 @@ DEFAULT_COLOR_LABELS_ITEM_TRACKER = {
     'BOW|NONE': (128, 128, 128),
     'BOW|BASIC': (128, 128, 128),
     'BOW|SILVERS': (128, 128, 128),
+    'BOW': {
+        'ON': (255, 0, 0),
+        'OFF': (0, 255, 0),
+    },
+    'default': {
+        'red': (255, 0, 0),
+        'green': (0, 255, 0),
+        'light blue': (173, 216, 230),
+        'dark blue': (0, 0, 139),
+        'orange': (255, 165, 0),
+        'yellow': (255, 255, 0),
+        'grey': (128, 128, 128)
+    }
 }
 
 class DunkaScanner:
@@ -517,9 +532,9 @@ class DunkaScanner:
     def _extract_rgb_values(self, frame: np.ndarray, frame_time: pd.Timedelta) -> List[Dict]:
         data = []
         for box, points, tracker_name, color_labels in [
-            (self.itemtracker_box, self.itemtracker_points, 'items', DEFAULT_COLOR_LABELS_ITEM_TRACKER),
-            (self.lightworld_map_box, self.lightworld_map_tracker_points, 'light world', DEFAULT_COLOR_LABELS_MAP_TRACKERS),
-            (self.darkworld_map_box, self.darkworld_map_tracker_points, 'dark world', DEFAULT_COLOR_LABELS_MAP_TRACKERS)
+            (self.itemtracker_box, self.itemtracker_points, 'IT', DEFAULT_COLOR_LABELS_ITEM_TRACKER),
+            (self.lightworld_map_box, self.lightworld_map_tracker_points, 'LW', DEFAULT_COLOR_LABELS_MAP_TRACKERS),
+            (self.darkworld_map_box, self.darkworld_map_tracker_points, 'DW', DEFAULT_COLOR_LABELS_MAP_TRACKERS)
         ]:
             if box:
                 x, y, w, h = box
@@ -538,7 +553,7 @@ class DunkaScanner:
                         H = np.degrees(np.arccos(H))
                         if B > G:
                             H = 360 - H
-                    color_label = self._classify_RGB_into_color_labels(R, G, B, H, S, I, color_labels)
+                    color_label = self._classify_RGB_into_color_labels(point_name, R, G, B, H, S, I, color_labels)
                     data.append({
                         'frame': frame_time,
                         'point_name': point_name,
@@ -607,11 +622,12 @@ class DunkaScanner:
         else:
             raise ValueError("Unsupported time format")
 
-    def _classify_RGB_into_color_labels(self, R, G, B, H, S, I, color_labels):
+    def _classify_RGB_into_color_labels(self, point_name: str, R, G, B, H, S, I, color_labels):
         """
         Classify the RGB and/or HSI values of a point into predefined color labels.
 
         Parameters:
+        - point_name: Name of the point.
         - R, G, B: Red, Green, Blue color values of the point.
         - H, S, I: Hue, Saturation, Intensity values of the point.
         - color_labels: Dictionary of predefined color labels and their RGB values.
@@ -619,10 +635,11 @@ class DunkaScanner:
         Returns:
         - label: The classified color label.
         """
+        point_color_labels = color_labels.get(point_name, color_labels['DEFAULT'])
         min_distance = float('inf')
         label = None
 
-        for color, (R_ref, G_ref, B_ref) in color_labels.items():
+        for color, (R_ref, G_ref, B_ref) in point_color_labels.items():
             distance = np.sqrt((R - R_ref) ** 2 + (G - G_ref) ** 2 + (B - B_ref) ** 2)
             if distance < min_distance:
                 min_distance = distance
