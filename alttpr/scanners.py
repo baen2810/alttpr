@@ -486,11 +486,24 @@ class DunkaScanner:
                 cv2.putText(temp_frame, label, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
                 B, G, R = frame[point_y, point_x]
+                I = (R + G + B) / 3
+                S = 1 - min(R, G, B) / I if I > 0 else 0
+                H = 0
+                if S != 0:
+                    R_prime = R / (R + G + B)
+                    G_prime = G / (R + G + B)
+                    B_prime = B / (R + G + B)
+                    H = 0.5 * ((R_prime - G_prime) + (R_prime - B_prime)) / ((R_prime - G_prime)**2 + (R_prime - B_prime) * (G_prime - B_prime))**0.5
+                    H = np.degrees(np.arccos(H))
+                    if B > G:
+                        H = 360 - H
+                color_label = DunkaScanner._classify_RGB_into_color_labels(point_name, R, G, B, H, S, I, DEFAULT_COLOR_LABELS_MAP_TRACKERS)
                 frame_data.append({
                     "tracker_name": "Tracker",
                     "R": R,
                     "G": G,
                     "B": B,
+                    "label": color_label,
                     "point_name": point_name,
                 })
 
@@ -599,7 +612,6 @@ class DunkaScanner:
         pprint(f'{title} points: {points}')
         return selected_box, points
 
-
     def _convert_to_timedelta(self, time: Union[int, str, pd.Timestamp, pd.Timedelta]) -> pd.Timedelta:
         if isinstance(time, int):
             return pd.to_timedelta(time / self.fps, unit='s')
@@ -681,7 +693,7 @@ class DunkaScanner:
         cap.release()
 
         # Create the dataframe
-        self.color_coord_df = pd.DataFrame(data, columns=['frame', 'tracker_name', 'point_name', 'R', 'G', 'B', 'H', 'S', 'I'])
+        self.color_coord_df = pd.DataFrame(data, columns=['frame', 'tracker_name', 'point_name', 'R', 'G', 'B', 'H', 'S', 'I', 'label'])
         self.color_coord_df['start_ts'] = self.start_ts
         self.color_coord_df['end_ts'] = self.end_ts
 
@@ -718,6 +730,7 @@ class DunkaScanner:
                     point_x = int(x + px)
                     point_y = int(y + py)
                     B, G, R = frame[point_y, point_x].astype(float)
+                    B, G, R = np.clip([B, G, R], 0, 255)  # Ensure values are within [0, 255]
                     I = (R + G + B) / 3
                     S = 1 - min(R, G, B) / I if I > 0 else 0
                     H = 0
@@ -740,9 +753,10 @@ class DunkaScanner:
                         'S': S,
                         'I': I,
                         'tracker_name': tracker_name,
-                        'color_label': color_label
+                        'label': color_label
                     })
         return data
+
 
     def _overlay_boxes_and_points(self, frame: np.ndarray) -> None:
         for box, points, label in [
@@ -761,14 +775,68 @@ class DunkaScanner:
                     cv2.circle(frame, (point_x, point_y), 2, (255, 255, 255), -1)
                     cv2.putText(frame, point_name, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
+    # @staticmethod
+    # def _draw_table(frame, frame_data, table_position: str = 'upper_left'):
+    #     """
+    #     Draw a table with RGB values on the frame.
+    #     """
+    #     table_text = "Tracker  Point Name  R    G    B    Label\n"
+    #     table_text += "\n".join([f"{item['tracker_name']}  {item['point_name']}  {int(item['R']):3d}  {int(item['G']):3d}  {int(item['B']):3d}  {item['label']}"
+    #                             for item in frame_data])
+
+    #     font = cv2.FONT_HERSHEY_SIMPLEX
+    #     font_scale = 0.5
+    #     font_thickness = 1
+    #     line_height = 15
+
+    #     lines = table_text.split('\n')
+
+    #     # Determine the position of the table
+    #     if table_position == 'upper_left':
+    #         x, y = 10, 10
+    #     elif table_position == 'upper_center':
+    #         x, y = frame.shape[1] // 2 - 200, 10
+    #     elif table_position == 'upper_right':
+    #         x, y = frame.shape[1] - 400, 10
+    #     elif table_position == 'lower_left':
+    #         x, y = 10, frame.shape[0] - (line_height * len(lines)) - 10
+    #     elif table_position == 'lower_center':
+    #         x, y = frame.shape[1] // 2 - 200, frame.shape[0] - (line_height * len(lines)) - 10
+    #     elif table_position == 'lower_right':
+    #         x, y = frame.shape[1] - 400, frame.shape[0] - (line_height * len(lines)) - 10
+    #     elif table_position == 'center_left':
+    #         x, y = 10, frame.shape[0] // 2 - (line_height * len(lines)) // 2
+    #     elif table_position == 'center':
+    #         x, y = frame.shape[1] // 2 - 200, frame.shape[0] // 2 - (line_height * len(lines)) // 2
+    #     elif table_position == 'center_right':
+    #         x, y = frame.shape[1] - 400, frame.shape[0] // 2 - (line_height * len(lines)) // 2
+    #     else:
+    #         return  # Do not draw the table if the position is None
+
+    #     # Draw the white box
+    #     box_width = max([cv2.getTextSize(line, font, font_scale, font_thickness)[0][0] for line in lines]) + 10
+    #     box_height = line_height * len(lines) + 10
+    #     cv2.rectangle(frame, (x - 5, y - 15), (x + box_width, y + box_height - 15), (255, 255, 255), cv2.FILLED)
+
+    #     # Draw the table text on the frame
+    #     for i, line in enumerate(lines):
+    #         cv2.putText(frame, line, (x, y + i * line_height), font, font_scale, (0, 0, 0), font_thickness, cv2.LINE_AA)
+
     @staticmethod
     def _draw_table(frame, frame_data, table_position: str = 'upper_left'):
         """
         Draw a table with RGB values on the frame.
         """
-        table_text = "Tracker  Point Name  R    G    B\n"
-        table_text += "\n".join([f"{item['tracker_name']}  {item['point_name']}  {int(item['R']):3d}  {int(item['G']):3d}  {int(item['B']):3d}"
-                                for item in frame_data])
+        # Define the desired order of columns
+        column_order = ["tracker_name", "R", "G", "B", "label", "point_name"]
+
+        # Create the table header
+        table_text = " ".join([col.capitalize() for col in column_order]) + "\n"
+
+        # Create the table rows based on the column order
+        for item in frame_data:
+            row_text = " ".join([str(item[col]) for col in column_order])
+            table_text += row_text + "\n"
 
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.5
@@ -809,7 +877,6 @@ class DunkaScanner:
             cv2.putText(frame, line, (x, y + i * line_height), font, font_scale, (0, 0, 0), font_thickness, cv2.LINE_AA)
 
 
-
     def _convert_to_timedelta(self, time: Union[int, str, pd.Timestamp, pd.Timedelta]) -> pd.Timedelta:
         if isinstance(time, int):
             return pd.to_timedelta(time / self.fps, unit='s')
@@ -829,7 +896,8 @@ class DunkaScanner:
         else:
             raise ValueError("Unsupported time format")
 
-    def _classify_RGB_into_color_labels(self, point_name: str, R, G, B, H, S, I, color_labels):
+    @classmethod
+    def _classify_RGB_into_color_labels(cls, point_name: str, R, G, B, H, S, I, color_labels):
         """
         Classify the RGB and/or HSI values of a point into predefined color labels.
 
