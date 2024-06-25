@@ -28,7 +28,7 @@
 
 """Schedulers"""
 
-# TODO tbd
+# TODO create tests
 
 from pathlib import Path
 from alttpr.crawlers import RacetimeCrawler
