@@ -1,8 +1,6 @@
 # alttpr
 A collection of tools to help with analytics on 'A Link to the Past Randomizer' races.
 
-**Note: work in progress**
-
 ALttPR is a collection of tools to build game analytics pipelines für 'A Link to the Past Randomizer' games.
 ALttPR pretty cool. If you want to learn more about Randomizers and Romhacking, checkout  (https://alttpr.com/en).
 Each playthrough shuffles the location of all the important items in the game making it a unique adventure.
