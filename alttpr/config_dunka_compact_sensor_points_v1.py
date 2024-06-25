@@ -1,211 +1,15 @@
-
-# Define the predefined RGB values for each color label
-DEFAULT_COLOR_LABELS_MAP_TRACKERS = {
-    'DEFAULT': {
-        'RED': (230, 0, 0),
-        'GREEN': (20, 255, 20),
-        'LIGHTBLUE': (40, 180, 240),
-        'DARKBLUE': (0, 0, 240),
-        'ORANGE': (240, 160, 20),
-        'YELLOW': (245, 255, 15),
-        'GREY': (128, 128, 128),
-        'PURPLE': (128, 0, 128),
-    },
-}
-
-# Define the predefined RGB values for each item tracker label
-DEFAULT_COLOR_LABELS_ITEM_TRACKER = {
-    '11|SWO': {
-        'NONE': (0, 0, 0),
-        'FIGHTER': (248, 248, 248),
-        'MASTER': (160, 248, 216),
-        'TEMPERED': (248, 160, 40),
-        'BUTTER': (248, 248, 200),
-    },
-    '12|BOW': {
-        'NONE': (0, 0, 0),
-        'SIMPLE': (248, 176, 80),
-        'SILVERS': (248, 248, 248),
-    },
-    '13|BMR': {
-        'NONE': (36, 42, 58),
-        'BLUE': (144, 168, 232),
-        'RED': (224, 112, 112),
-    },
-    '14|HKS': {
-        'NONE': (44, 10, 10),
-        'AVLBL': (176, 40, 40),
-    },
-    '15|BMB': {
-        'NONE': (64, 64, 64),
-        'AVLBL': (255, 255, 255),
-    },
-    '16|MSR': {
-        'NONE': (46, 34, 8),
-        'AVLBL': (200, 48, 24),
-    },
-    '17|POW': {
-        'NONE': (46, 24, 10),
-        'AVLBL': (248, 176, 80),
-    },
-    '21|MNP': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '22|FIR': {
-        'NONE': (56, 28, 28),
-        'AVLBL': (224, 112, 112),
-    },
-    '23|ICR': {
-        'NONE': (36, 42, 58),
-        'AVLBL': (144, 168, 232),
-    },
-    '24|BBS': {
-        'NONE': (46, 35, 10),
-        'AVLBL': (184, 140, 40),
-    },
-    '25|ETH': {
-        'NONE': (46, 35, 10),
-        'AVLBL': (184, 140, 40),
-    },
-    '26|QUK': {
-        'NONE': (46, 35, 10),
-        'AVLBL': (184, 140, 40),
-    },
-    '31|EP': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '32|LMP': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '33|HMR': {
-        'NONE': (50, 22, 12),
-        'AVLBL': (200, 88, 48),
-    },
-    '34|SVL': {
-        'NONE': (46, 46, 50),
-        'AVLBL': (148, 148, 200),
-    },
-    '35|FLU': {
-        'NONE': (20, 26, 42),
-        'AVLBL': (144, 168, 232),
-    },
-    '36|BGN': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '37|BOK': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '38|SLD': {
-        'NONE': (0, 0, 0),
-        'WOOD': (248, 248, 248),
-        'IRON': (176, 40, 40),
-        'MIRROR': (200, 224, 224),
-    },
-    '41|DP': {
-        'NONE': (16, 32, 22),
-        'AVLBL': (80, 192, 144),
-    },
-    '42|BTL': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '43|SOM': {
-        'NONE': (56, 28, 28),
-        'AVLBL': (224, 112, 112),
-    },
-    '44|BYR': {
-        'NONE': (36, 42, 58),
-        'AVLBL': (144, 168, 232),
-    },
-    '45|CAP': {
-        'NONE': (56, 28, 28),
-        'AVLBL': (224, 112, 112),
-    },
-    '46|MIR': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '51|TH': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '52|BTS': {
-        'NONE': (56, 28, 28),
-        'AVLBL': (224, 112, 112),
-    },
-    '53|GLV': {
-        'NONE': (62, 62, 62),
-        'MITTS': (120, 120, 136),
-        'TITANS': (184, 139, 38),
-    },
-    '54|FLP': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '55|MAG': {
-        'NONE': (38, 52, 28),
-        'AVLBL': (153, 209, 113),
-    },
-    '56|AG1': {
-        'NONE': (30, 30, 30),
-        'AVLBL': (0, 0, 0),
-    },
-    '57|AG2': {
-        'NONE': (30, 30, 30),
-        'AVLBL': (0, 0, 0),
-    },
-    '61|POD': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '62|SP': {
-        'NONE': (58, 32, 26),
-        'AVLBL': (232, 128, 104),
-    },
-    '63|SW': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '64|TT': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '65|IP': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '66|MM': {
-        'NONE': (62, 62, 62),
-        'AVLBL': (248, 248, 248),
-    },
-    '67|TR': {
-        'NONE': (28, 28, 26),
-        'AVLBL': (248, 248, 248),
-    },
-    'DEFAULT': {
-        'OFF': (62, 62, 62),
-        'ON': (248, 248, 248),
-    }
-}
-
-
 # default coordinates for the itemtracker box
-DEFAULT_ITEMTRACKER_BOX = (1418, 0, 245, 224)
+ITEMTRACKER_BOX = (1418, 0, 245, 224)
 
 # default coordinates for the lightworld map tracker box
-DEFAULT_LIGHTWORLD_MAP_BOX = (1413, 229, 251, 261)
+LIGHTWORLD_MAP_BOX = (1413, 229, 251, 261)
 
 # default coordinates for the darkworld map tracker box
-DEFAULT_DARKWORLD_MAP_BOX = (1670, 229, 249, 260)
+DARKWORLD_MAP_BOX = (1670, 229, 249, 260)
 
 # default tracking point coordinates for the itemtracker box
 # absolute pixels relative to top left corner of box
-DEFAULT_ITEMTRACKER_POINTS = {
+ITEMTRACKER_POINTS = {
     # itemtracker row 1
     '11|SWO': (52, 6),
     '12|BOW': (98, 4),
@@ -257,7 +61,7 @@ DEFAULT_ITEMTRACKER_POINTS = {
 
 # default tracking point coordinates for the lightworld map tracker box
 # absolute pixels relative to top left corner of box
-DEFAULT_LIGHTWORLD_MAP_POINTS = {
+LIGHTWORLD_MAP_POINTS = {
     # lost woods & countryside
     "111|PED": (13, 7),
     "112|SHROOM": (31, 22),
@@ -326,10 +130,10 @@ DEFAULT_LIGHTWORLD_MAP_POINTS = {
 
 # default tracking point coordinates for the darkworld map tracker box
 # absolute pixels relative to top left corner of box
-DEFAULT_DARKWORLD_MAP_POINTS = {
+DARKWORLD_MAP_POINTS = {
     # skull woods & countryside
     "111|SW_DUNGEON": (5, 21),
-    "112|SW_BOSS": (7, 16),
+    "112|SW_BOSS": (9, 16),
     "113|PURPLECHEST": (73, 141),
     "114|HAMMERPEGS": (77, 161),
     "115|STUMPY": (76, 184),
@@ -358,7 +162,7 @@ DEFAULT_DARKWORLD_MAP_POINTS = {
     "171|TR_DUNGEON": (228, 26),
     "172|TR_BOSS": (230, 20),
     "173|GT_DUNGEON": (136, 22),
-    "174|GT_BOSS": (137, 16),
+    "174|GT_BOSS": (139, 16),
     "175|SBUNNYCAVE": (214, 38),
     "176|HSCAVE": (208, 8),
     "177|HSCAVELOW": (208, 22),
