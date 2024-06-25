@@ -7,6 +7,7 @@ tests/data/temp_data/
 scripts/
 export/
 input/
+logs/
 __pycache__/
 .ipynb_checkpoints/
-alttpr_crawler.py
+alttpr*.py
