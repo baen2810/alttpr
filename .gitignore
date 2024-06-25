@@ -4,6 +4,7 @@
 # Logfiles
 logs/
 tests/data/temp_data/
+tests/data/_tmp/
 scripts/
 export/
 input/
@@ -11,3 +12,4 @@ logs/
 __pycache__/
 .ipynb_checkpoints/
 alttpr*.py
+tracker_box_and_points.txt
