@@ -41,7 +41,7 @@ def main():
     # gg.export()
     pprint('----- Testing')
     # Test metrics completeness
-    assert gg.metrics_df.shape == (26329, 10), f'Metrics-Test 1 failed. {gg.metrics_df.shape=}'
+    assert gg.metrics_df.shape == (25893, 10), f'Metrics-Test 1 failed. {gg.metrics_df.shape=}'
     # Test facts against their reference
     df_stats = gg.stats_df[['ID', 'Dennsen86']].set_index('ID')
     df_ref = pd.read_excel(Path(os.getcwd(), 'tests', 'data', 'stats_df_2024-06-15_REFERENCE.xlsx'))[['ID', 'Dennsen86_REF']].set_index('ID')

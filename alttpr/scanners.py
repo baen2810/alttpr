@@ -28,24 +28,13 @@
 
 """Dunka Scanner"""
 
-# TODO tbd
+# TODO add internal consistency for output data, e.g. check consistency of boss status from map and item tracker
 
-# from __future__ import annotations
-# from collections.abc import Callable, Iterator
-# from functools import reduce
-# from sys import stderr
-from datetime import datetime as dt
-from typing import Any
-from warnings import warn
 from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path
-from tqdm import trange, tqdm
-from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str, to_tstr, to_dstr
-from alttpr.configs import DEFAULT_COLOR_LABELS_MAP_TRACKERS, DEFAULT_COLOR_LABELS_ITEM_TRACKER
-# import base64
-# import io
-# import re
-# import struct
+from tqdm import tqdm
+from alttpr.utils import pprint, pprintdesc
+from alttpr.config_color_labels_default import COLOR_LABELS_MAP_TRACKERS, COLOR_LABELS_ITEM_TRACKER
 import os
 import numpy as np
 import pandas as pd
@@ -147,7 +136,7 @@ class DunkaScanner:
         self.video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         # Calculate the file size in KB
-        self.video_size = self.input_video_path.stat().st_size / 1024  # in KB
+        self.video_size = round((self.input_video_path.stat().st_size / 1024) / 1024, 1)  # in MB
 
         # Convert start_ts and end_ts to timedelta
         self.start_ts = self._convert_to_timedelta(start_ts)
@@ -162,7 +151,7 @@ class DunkaScanner:
 
         pprint(f'Video: {self.input_video_path}')
         pprint(f'FPS: {self.fps}')
-        pprint(f'Size (kB): {self.video_size}')
+        pprint(f'Size (MB): {self.video_size}')
         pprint(f'Video length: {self.video_length.components.hours:02}:{self.video_length.components.minutes:02}:{self.video_length.components.seconds:02}')
         pprint(f'Video resolution: {self.video_width}x{self.video_height}')
         pprint(f'Number of item tracker points: {len(self.itemtracker_points)}')
@@ -319,18 +308,18 @@ class DunkaScanner:
                 cv2.putText(temp_frame, label, (point_x + 5, point_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
                 B, G, R = frame[point_y, point_x]
-                if point_name in DEFAULT_COLOR_LABELS_ITEM_TRACKER.keys():  # TODO this may break when not all items are explicit keys but use default instead
-                    color_labels = DEFAULT_COLOR_LABELS_ITEM_TRACKER
+                if point_name in COLOR_LABELS_ITEM_TRACKER.keys():  # TODO this may break when not all items are explicit keys but use default instead
+                    color_labels = COLOR_LABELS_ITEM_TRACKER
                 else:
-                    color_labels = DEFAULT_COLOR_LABELS_MAP_TRACKERS
+                    color_labels = COLOR_LABELS_MAP_TRACKERS
                 color_label = DunkaScanner._classify_RGB_into_color_labels(point_name, R, G, B, color_labels)
                 frame_data.append({
                     "tracker_name": "Tracker",
-                    "R": R,
-                    "G": G,
-                    "B": B,
-                    "label": color_label,
-                    "point_name": point_name,
+                    "R": str(R).zfill(3),
+                    "G": str(G).zfill(3),
+                    "B": str(B).zfill(3),
+                    "label": color_label.ljust(7),
+                    "point_name": point_name.ljust(7),
                 })
 
             DunkaScanner._draw_table(temp_frame, frame_data, 'center_left')
@@ -505,12 +494,6 @@ class DunkaScanner:
             
             self._draw_table(frame, frame_data, table_position,
                              font_scale=0.25, line_height=8)
-            # for t, p in zip(['LW', 'DW', 'IT'], ['left_bottom', 'mid_bottom', 'right_bottom']):
-            #     frame_data_tmp = []
-            #     for i in range(len(frame_data)):
-            #         if frame_data[i]['tracker_name'] == t:
-            #             frame_data_tmp += [frame_data[i]]
-            #     self._draw_table(frame, frame_data_tmp, p)
 
             # Append data for dataframe
             data.extend(frame_data)
@@ -528,6 +511,11 @@ class DunkaScanner:
 
         # Create the dataframe
         self.color_coord_df = pd.DataFrame(data, columns=['frame', 'tracker_name', 'point_name', 'R', 'G', 'B', 'label'])
+        self.color_coord_df['R'] = self.color_coord_df['R'].astype(float).astype(int)
+        self.color_coord_df['G'] = self.color_coord_df['G'].astype(float).astype(int)
+        self.color_coord_df['B'] = self.color_coord_df['B'].astype(float).astype(int)
+        self.color_coord_df['point_name'] = self.color_coord_df['point_name'].str.strip()
+        self.color_coord_df['label'] = self.color_coord_df['label'].str.strip()
         self.color_coord_df['start_ts'] = self.start_ts
         self.color_coord_df['end_ts'] = self.end_ts
 
@@ -554,9 +542,9 @@ class DunkaScanner:
     def _extract_rgb_values(self, frame: np.ndarray, frame_time: pd.Timedelta) -> List[Dict]:
         data = []
         for box, points, tracker_name, color_labels in [
-            (self.itemtracker_box, self.itemtracker_points, 'IT', DEFAULT_COLOR_LABELS_ITEM_TRACKER),
-            (self.lightworld_map_box, self.lightworld_map_tracker_points, 'LW', DEFAULT_COLOR_LABELS_MAP_TRACKERS),
-            (self.darkworld_map_box, self.darkworld_map_tracker_points, 'DW', DEFAULT_COLOR_LABELS_MAP_TRACKERS)
+            (self.itemtracker_box, self.itemtracker_points, 'IT', COLOR_LABELS_ITEM_TRACKER),
+            (self.lightworld_map_box, self.lightworld_map_tracker_points, 'LW', COLOR_LABELS_MAP_TRACKERS),
+            (self.darkworld_map_box, self.darkworld_map_tracker_points, 'DW', COLOR_LABELS_MAP_TRACKERS)
         ]:
             if box:
                 x, y, w, h = box
@@ -568,12 +556,12 @@ class DunkaScanner:
                     color_label = self._classify_RGB_into_color_labels(point_name, R, G, B, color_labels)
                     data.append({
                         'frame': frame_time,
-                        'point_name': point_name,
-                        'R': R,
-                        'G': G,
-                        'B': B,
-                        'tracker_name': tracker_name,
-                        'label': color_label
+                        'point_name': point_name.ljust(7),
+                        'R': str(R).zfill(3),
+                        'G': str(G).zfill(3),
+                        'B': str(B).zfill(3),
+                        'tracker_name': tracker_name.ljust(7),
+                        'label': color_label.ljust(7)
                     })
         return data
 
@@ -724,25 +712,74 @@ class DunkaScanner:
 
             params = {attr: getattr(self, attr) for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")}
             params_df = pd.DataFrame(list(params.items()), columns=['Attribute', 'Value'])
+            params_df['Value'] = params_df['Value'].astype(str)
             params_df.to_excel(writer, sheet_name='params', index=False)
 
-        # Define a function to export a dictionary to a text file
-        def export_dict_to_txt(attr_name, attr_value):
-            txt_file = self.output_path / self.input_video_path.stem / f"{attr_name}.txt"
-            with open(txt_file, 'w') as f:
-                f.write(f"{attr_name.upper()} = {{\n")
-                for key, value in attr_value.items():
-                    f.write(f'    "{key}": {value},\n')
-                f.write('}\n')
-            pprint(f"{attr_name} exported to {txt_file}")
+        # # Define a function to export a dictionary to a text file
+        # def export_dict_to_txt(attr_name, attr_value):
+        #     txt_file = self.output_path / self.input_video_path.stem / f"{attr_name}.txt"
+        #     with open(txt_file, 'w') as f:
+        #         f.write(f"{attr_name.upper()} = {{\n")
+        #         for key, value in attr_value.items():
+        #             f.write(f'    "{key}": {value},\n')
+        #         f.write('}\n')
+        #     pprint(f"{attr_name} exported to {txt_file}")
 
         # Export the specified class attributes to their own text files
-        export_dict_to_txt('itemtracker_box', {"x": self.itemtracker_box[0], "y": self.itemtracker_box[1], "w": self.itemtracker_box[2], "h": self.itemtracker_box[3]})
-        export_dict_to_txt('lightworld_map_box', {"x": self.lightworld_map_box[0], "y": self.lightworld_map_box[1], "w": self.lightworld_map_box[2], "h": self.lightworld_map_box[3]})
-        export_dict_to_txt('darkworld_map_box', {"x": self.darkworld_map_box[0], "y": self.darkworld_map_box[1], "w": self.darkworld_map_box[2], "h": self.darkworld_map_box[3]})
-        export_dict_to_txt('itemtracker_points', self.itemtracker_points)
-        export_dict_to_txt('lightworld_map_tracker_points', self.lightworld_map_tracker_points)
-        export_dict_to_txt('darkworld_map_tracker_points', self.darkworld_map_tracker_points)
+        # export_dict_to_txt('itemtracker_box', {"x": self.itemtracker_box[0], "y": self.itemtracker_box[1], "w": self.itemtracker_box[2], "h": self.itemtracker_box[3]})
+        # export_dict_to_txt('lightworld_map_box', {"x": self.lightworld_map_box[0], "y": self.lightworld_map_box[1], "w": self.lightworld_map_box[2], "h": self.lightworld_map_box[3]})
+        # export_dict_to_txt('darkworld_map_box', {"x": self.darkworld_map_box[0], "y": self.darkworld_map_box[1], "w": self.darkworld_map_box[2], "h": self.darkworld_map_box[3]})
+        # export_dict_to_txt('itemtracker_points', self.itemtracker_points)
+        # export_dict_to_txt('lightworld_map_tracker_points', self.lightworld_map_tracker_points)
+        # export_dict_to_txt('darkworld_map_tracker_points', self.darkworld_map_tracker_points)
+
+        # Define a function to export a dictionary to a text file
+        def export_dict_to_txt(dict_name, dictionary, delete=False):
+            txt_file = self.output_path / self.input_video_path.stem / "config.py"
+            # Ensure the directory exists
+            txt_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Check if the file exists and read existing content if it does
+            # if txt_file.exists():
+            #     if delete:
+            #         txt_file.unlink()
+            #     else:
+            #         with open(txt_file, 'r') as f:
+            #             lines = f.readlines()
+            # else:
+            #     lines = []
+            # Delete the file if it exists
+            if txt_file.exists() and delete:
+                txt_file.unlink()
+            # Write the dictionary to the file, appending if the file exists
+            with open(txt_file, 'a') as f:
+                f.write(f"{dict_name} = {{\n")
+                for key, value in dictionary.items():
+                    f.write(f'    "{key}": {value},\n')
+                f.write('}\n')
+            
+            pprint(f"{dict_name} exported to {txt_file}")
+        
+        # Define a function to export a tuple to a text file
+        def export_tuple_to_txt(tuple_name, tuple_value, delete=False):
+            txt_file = self.output_path / self.input_video_path.stem / f"config.py"
+            # Ensure the directory exists
+            txt_file.parent.mkdir(parents=True, exist_ok=True)
+            # Delete the file if it exists
+            if txt_file.exists() and delete:
+                txt_file.unlink()
+            # Write the tuple to the file, appending if the file exists
+            with open(txt_file, 'a') as f:
+                f.write(f"{tuple_name} = {tuple_value}\n")
+            
+            pprint(f"{tuple_name} exported to {txt_file}")
+
+        export_tuple_to_txt('ITEMTRACKER_BOX', self.itemtracker_box, delete=True)
+        export_tuple_to_txt('LIGHTWORLD_MAP_BOX', self.lightworld_map_box)
+        export_tuple_to_txt('DARKWORLD_MAP_BOX', self.darkworld_map_box)
+        export_dict_to_txt('ITEMTRACKER_POINTS', self.itemtracker_points)
+        export_dict_to_txt('LIGHTWORLD_MAP_POINTS', self.lightworld_map_tracker_points)
+        export_dict_to_txt('DARKWORLD_MAP_POINTS', self.darkworld_map_tracker_points)
 
         pprint(f"Data exported to {output_file}")
     
