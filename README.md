@@ -79,7 +79,7 @@ The scanner may require some calibration, it will walk you through five steps:
 
 Once these steps have been completed, the scanner parses the video and produces output artifacts. Check the console output.
 
-# Scan a local VOD of an ALttPR race using the DunkaScanner
+# Testing
 To check code integrity, simply do
 
 ```py
