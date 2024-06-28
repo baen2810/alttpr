@@ -14,5 +14,5 @@ __pycache__/
 .ipynb_checkpoints/
 alttpr*.py
 tracker_box_and_points.txt
-# .env
+.env
 requirements_versionfree*.txt
