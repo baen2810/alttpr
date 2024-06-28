@@ -654,6 +654,9 @@ class RacetimeCrawler:
     def set_output_path(self, path: Union[Path, str]) -> None:
         self.output_path = Path(path)
 
+    def set_stats_template_path(self, path: Union[Path, str]) -> None:
+        self.stats_template_path = Path(path)
+
     def export(self, path: Union[Path, str] = None, dfs: List[str] = ['hosts_df', 'races_df', 'metrics_df', 'stats_df'], host_names: Union[str, List[str]] = []) -> None:
         host_names = [host_names] if isinstance(host_names, str) else host_names
         host_names = list(self.hosts_df.host_name) if len(host_names) == 0 else host_names
