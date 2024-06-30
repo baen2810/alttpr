@@ -16,3 +16,5 @@ alttpr*.py
 tracker_box_and_points.txt
 .env
 requirements_versionfree*.txt
+alttpr/config_timestamps_tmp.py
+alttpr/config_trackerpoints_tmp.py
