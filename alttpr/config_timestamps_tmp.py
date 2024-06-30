@@ -1,0 +1,4 @@
+START_END_TIMESTAMP = {
+    "START_TS": '00:01:30',
+    "END_TS": '01:21:00',
+}
