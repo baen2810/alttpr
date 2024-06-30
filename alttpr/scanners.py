@@ -29,6 +29,8 @@
 """Dunka Scanner"""
 
 # TODO add internal consistency for output data, e.g. check consistency of boss status from map and item tracker
+# TODO handle reference count overflow error when picking the very first frame as starting point (ALTTP Rando #09.01.2024.mp4)
+# TODO fix issue when selecting end time
 
 from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path

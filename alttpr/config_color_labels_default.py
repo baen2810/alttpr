@@ -9,8 +9,8 @@ COLOR_LABELS_MAP_TRACKERS = {
         'ORANGE': (240, 160, 20),
         'YELLOW': (245, 255, 15),
         'GREY': (128, 128, 128),
-        'GREY': (43, 134, 29),  # for Dunka Compact 2024
-        'GREY': (68, 221, 65),  # for Dunka Compact 2024
+        'GREY-2': (43, 134, 29),  # for Dunka Compact 2024
+        'GREY-3': (68, 221, 65),  # for Dunka Compact 2024
         'PURPLE': (128, 0, 128),
     },
 }
