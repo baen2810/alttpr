@@ -117,7 +117,7 @@ class DunkaScanner:
             raise ValueError("Error: Could not open video.")
 
         # Get the video's frames per second (fps)
-        self.fps = cap.get(cv2.CAP_PROP_FPS)
+        self.fps = int(cap.get(cv2.CAP_PROP_FPS) + 1)
         if self.fps == 0:  # Handle cases where FPS might be zero or unavailable
             raise ValueError("Error: Could not get video FPS.")
 
@@ -174,12 +174,12 @@ class DunkaScanner:
         if not cap.isOpened():
             raise ValueError("Error: Could not open video.")
 
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        fps = int(cap.get(cv2.CAP_PROP_FPS) + 1)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         default_frame = int(pd.to_timedelta(default_time).total_seconds() * fps)
         current_frame = default_frame
 
-        jump_to_frame = min(int(1.5 * 3600 * fps), total_frames - 1)  # Jump to 01:30:00 or end of video
+        jump_to_frame = min(int(1.5 * 3600 * fps), total_frames - 2*fps)  # Jump to 01:30:00 or end of video
 
         window_title = title + " (e: select, w: forward 30s, s: back 30s, d: forward 1s, a: back 1s, f: jump to 01:30:00, y: back 1 min, c: forward 1 min, r: back 1 frame, t: forward 1 frame, q: quit)"
 
@@ -456,6 +456,7 @@ class DunkaScanner:
         - save_nth_frame: Save every nth frame (default is 10).
         """
         # Check and clear output directory
+        save_nth_frame = save_nth_frame * self.fps
         video_name = self.input_video_path.stem  # Get the video file name without extension
         frames_output_path = self.output_path / video_name / 'frames'
         self._check_and_delete_existing_output(frames_output_path)
@@ -520,6 +521,7 @@ class DunkaScanner:
         self.color_coord_df['end_ts'] = self.end_ts
 
         # Zip the output directory and clean up
+        pprint('Zipping frames')
         self._zip_output_folder(frames_output_path)
 
     def _calculate_frame_extraction_intervals(self) -> Tuple[int, range]:
@@ -663,7 +665,6 @@ class DunkaScanner:
         Parameters:
         - point_name: Name of the point.
         - R, G, B: Red, Green, Blue color values of the point.
-        - H, S, I: Hue, Saturation, Intensity values of the point.
         - color_labels: Dictionary of predefined color labels and their RGB values.
 
         Returns:
@@ -674,7 +675,7 @@ class DunkaScanner:
         label = None
 
         for color, (R_ref, G_ref, B_ref) in point_color_labels.items():
-            distance = np.sqrt((R - R_ref) ** 2 + (G - G_ref) ** 2 + (B - B_ref) ** 2)
+            distance = int(np.sqrt((int(R) - int(R_ref)) ** 2 + (int(G) - int(G_ref)) ** 2 + (int(B) - int(B_ref)) ** 2))
             if distance < min_distance:
                 min_distance = distance
                 label = color
@@ -703,51 +704,12 @@ class DunkaScanner:
         On the second sheet 'params', save all other class attributes.
         """
         output_file = self.output_path / self.input_video_path.stem / f"{self.input_video_path.stem}.xlsx"
-        with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-            df_color_coord = self.color_coord_df.copy()
-            df_color_coord.frame = [str(s)[-8:] for s in df_color_coord.frame]
-            df_color_coord.start_ts = [str(s)[-8:] for s in df_color_coord.start_ts]
-            df_color_coord.end_ts = [str(s)[-8:] for s in df_color_coord.end_ts]
-            df_color_coord.to_excel(writer, sheet_name='data', index=False)
-
-            params = {attr: getattr(self, attr) for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")}
-            params_df = pd.DataFrame(list(params.items()), columns=['Attribute', 'Value'])
-            params_df['Value'] = params_df['Value'].astype(str)
-            params_df.to_excel(writer, sheet_name='params', index=False)
-
-        # # Define a function to export a dictionary to a text file
-        # def export_dict_to_txt(attr_name, attr_value):
-        #     txt_file = self.output_path / self.input_video_path.stem / f"{attr_name}.txt"
-        #     with open(txt_file, 'w') as f:
-        #         f.write(f"{attr_name.upper()} = {{\n")
-        #         for key, value in attr_value.items():
-        #             f.write(f'    "{key}": {value},\n')
-        #         f.write('}\n')
-        #     pprint(f"{attr_name} exported to {txt_file}")
-
-        # Export the specified class attributes to their own text files
-        # export_dict_to_txt('itemtracker_box', {"x": self.itemtracker_box[0], "y": self.itemtracker_box[1], "w": self.itemtracker_box[2], "h": self.itemtracker_box[3]})
-        # export_dict_to_txt('lightworld_map_box', {"x": self.lightworld_map_box[0], "y": self.lightworld_map_box[1], "w": self.lightworld_map_box[2], "h": self.lightworld_map_box[3]})
-        # export_dict_to_txt('darkworld_map_box', {"x": self.darkworld_map_box[0], "y": self.darkworld_map_box[1], "w": self.darkworld_map_box[2], "h": self.darkworld_map_box[3]})
-        # export_dict_to_txt('itemtracker_points', self.itemtracker_points)
-        # export_dict_to_txt('lightworld_map_tracker_points', self.lightworld_map_tracker_points)
-        # export_dict_to_txt('darkworld_map_tracker_points', self.darkworld_map_tracker_points)
-
         # Define a function to export a dictionary to a text file
-        def export_dict_to_txt(dict_name, dictionary, delete=False):
-            txt_file = self.output_path / self.input_video_path.stem / "config.py"
+        def export_dict_to_txt(dict_name, dictionary, delete=False, fn="config_trackerpoints.py"):
+            txt_file = self.output_path / self.input_video_path.stem / fn
             # Ensure the directory exists
             txt_file.parent.mkdir(parents=True, exist_ok=True)
 
-            # Check if the file exists and read existing content if it does
-            # if txt_file.exists():
-            #     if delete:
-            #         txt_file.unlink()
-            #     else:
-            #         with open(txt_file, 'r') as f:
-            #             lines = f.readlines()
-            # else:
-            #     lines = []
             # Delete the file if it exists
             if txt_file.exists() and delete:
                 txt_file.unlink()
@@ -761,8 +723,8 @@ class DunkaScanner:
             pprint(f"{dict_name} exported to {txt_file}")
         
         # Define a function to export a tuple to a text file
-        def export_tuple_to_txt(tuple_name, tuple_value, delete=False):
-            txt_file = self.output_path / self.input_video_path.stem / f"config.py"
+        def export_tuple_to_txt(tuple_name, tuple_value, delete=False, fn="config_trackerpoints.py"):
+            txt_file = self.output_path / self.input_video_path.stem / fn
             # Ensure the directory exists
             txt_file.parent.mkdir(parents=True, exist_ok=True)
             # Delete the file if it exists
@@ -780,6 +742,20 @@ class DunkaScanner:
         export_dict_to_txt('ITEMTRACKER_POINTS', self.itemtracker_points)
         export_dict_to_txt('LIGHTWORLD_MAP_POINTS', self.lightworld_map_tracker_points)
         export_dict_to_txt('DARKWORLD_MAP_POINTS', self.darkworld_map_tracker_points)
+        export_dict_to_txt('START_END_TIMESTAMP', {'START_TS': '\''+ str(self.start_ts)[-8:] + '\'', 'END_TS': '\'' + str(self.end_ts)[-8:] + '\''}, fn="config_timestamps.py", delete=True)
+
+        pprint('Exporting raw data')
+        with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+            df_color_coord = self.color_coord_df.copy()
+            df_color_coord.frame = [str(s)[-8:] for s in df_color_coord.frame]
+            df_color_coord.start_ts = [str(s)[-8:] for s in df_color_coord.start_ts]
+            df_color_coord.end_ts = [str(s)[-8:] for s in df_color_coord.end_ts]
+            df_color_coord.to_excel(writer, sheet_name='data', index=False)
+
+            params = {attr: getattr(self, attr) for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")}
+            params_df = pd.DataFrame(list(params.items()), columns=['Attribute', 'Value'])
+            params_df['Value'] = params_df['Value'].astype(str)
+            params_df.to_excel(writer, sheet_name='params', index=False)
 
         pprint(f"Data exported to {output_file}")
     
@@ -787,9 +763,10 @@ class DunkaScanner:
         """
         Save the DunkaScanner object to the output directory as a .pkl file.
         """
+        pprint('Saving Scanner object', end='...')
         with open(self.output_path / self.input_video_path.stem / f"{self.input_video_path.stem}.pkl", 'wb') as file:
             pickle.dump(self, file)
-        pprint(f"Scanner object saved to {self.output_path / f'{self.input_video_path.stem}.pkl'}")
+        print(f"saved to {self.output_path / self.input_video_path.stem / f'{self.input_video_path.stem}.pkl'}")
 
     @staticmethod
     def load(file_path: Union[str, Path]) -> 'DunkaScanner':
