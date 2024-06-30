@@ -1,6 +1,6 @@
 from alttpr.scanners import DunkaScanner
-from alttpr.config_dunka_compact_sensor_points import ITEMTRACKER_POINTS, LIGHTWORLD_MAP_POINTS, DARKWORLD_MAP_POINTS
-from alttpr.config_dunka_compact_sensor_points import ITEMTRACKER_BOX, LIGHTWORLD_MAP_BOX, DARKWORLD_MAP_BOX
+from alttpr.config_dunka_compact_tests import ITEMTRACKER_POINTS, LIGHTWORLD_MAP_POINTS, DARKWORLD_MAP_POINTS
+from alttpr.config_dunka_compact_tests import ITEMTRACKER_BOX, LIGHTWORLD_MAP_BOX, DARKWORLD_MAP_BOX
 from alttpr.utils import pprint
 
 import os

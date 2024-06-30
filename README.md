@@ -117,6 +117,11 @@ The scanner may require some calibration, it will walk you through five steps:
 4) Select lightworld map tracker box and sensor points: Use the keybindings to align the lightworld map tracker scanner box with the location of the Dunka lightworld map tracker in the VOD
 5) Select darkworld map tracker box and sensor points: Use the keybindings to align the darkworld map tracker scanner box with the location of the Dunka darkworld map tracker in the VOD
 
+Example calibration step of the scanner's lightworld map tracker:
+<p style="margin-left: 40px;">
+  <img src="dunka_scanner_example.png" alt="Calibration of the Scanner" style="width:50%;">
+</p>
+
 To try it out simply do
 
 ```py
