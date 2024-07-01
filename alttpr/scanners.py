@@ -33,6 +33,7 @@
 # TODO fix issue when selecting end time
 # TODO add third scanner points for boomerang 
 # TODO ensure DEBUG is read from env var
+# get readline to work
 
 from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path
@@ -79,13 +80,16 @@ class DunkaScanner:
     def __init__(self, input_video_path: Union[str, Path], output_path: Union[str, Path], 
                  start_ts: Union[int, str, pd.Timestamp, pd.Timedelta] = 0, 
                  end_ts: Optional[Union[int, str, pd.Timestamp, pd.Timedelta]] = None, 
+                 offset_ts: Optional[Union[int, str, pd.Timestamp, pd.Timedelta]] = pd.Timedelta('00:00:00'), 
                  frames_per_second: int = 1, 
                  itemtracker_box: Tuple[int, int, int, int] = None,
                  lightworld_map_box: Tuple[int, int, int, int] = None, 
                  darkworld_map_box: Tuple[int, int, int, int] = None,
                  itemtracker_points: dict = None,
                  lightworld_map_tracker_points: dict = None,
-                 darkworld_map_tracker_points: dict = None) -> None:
+                 darkworld_map_tracker_points: dict = None,
+                 notes: Optional[str] = None,
+                 ) -> None:
         """
         Initialize the DunkaScanner with video and extraction parameters.
 
@@ -112,6 +116,7 @@ class DunkaScanner:
         self.lightworld_map_tracker_points = lightworld_map_tracker_points
         self.darkworld_map_tracker_points = darkworld_map_tracker_points
         self.color_coord_df = pd.DataFrame()
+        self.notes = notes
         
         self.frames = []  # Initialize the frames attribute
 
@@ -145,6 +150,7 @@ class DunkaScanner:
         # Convert start_ts and end_ts to timedelta
         self.start_ts = self._convert_to_timedelta(start_ts)
         self.end_ts = self._convert_to_timedelta(end_ts) if end_ts is not None else self.video_length
+        self.offset_ts = self._convert_to_timedelta(offset_ts)
 
         # Ensure end_ts does not exceed the video length
         if self.end_ts > self.video_length:
@@ -185,7 +191,7 @@ class DunkaScanner:
 
         jump_to_frame = min(int(1.5 * 3600 * fps), total_frames - 2*fps)  # Jump to 01:30:00 or end of video
 
-        window_title = title + " (e: select, w: forward 30s, s: back 30s, d: forward 1s, a: back 1s, f: jump to 01:30:00, y: back 1 min, c: forward 1 min, r: back 1 frame, t: forward 1 frame, q: quit)"
+        window_title = title + " (e: select, w: forward 30s, s: back 30s, d: forward 1s, a: back 1s, f: jump to 01:30:00, b: forward 5 min, v: back 5 min, y: back 1 min, c: forward 1 min, r: back 1 frame, t: forward 1 frame, q: quit)"
 
         while True:
             cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
@@ -224,6 +230,18 @@ class DunkaScanner:
                 current_frame = max(0, current_frame - 1)
             elif key == ord('t'):
                 current_frame = min(current_frame + 1, total_frames - 1)
+            elif key == ord('b'):
+                current_frame = min(current_frame + int(5 * 60 * fps), int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+            elif key == ord('v'):
+                current_frame = max(0, current_frame - int(5 * 60 * fps))
+                cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+                ret, frame = cap.read()
+                if not ret:
+                    break
             elif key == ord('q'):  # 'q' to quit
                 cap.release()
                 cv2.destroyAllWindows()
@@ -234,9 +252,209 @@ class DunkaScanner:
         cv2.destroyAllWindows()
 
         selected_time = pd.to_timedelta(current_frame / fps, unit='s')
-        pprint(f'Selected {title.lower()}: {selected_time.components.hours:02}:{selected_time.components.minutes:02}:{selected_time.components.seconds:02}')
+
+        pprint(f'{title}: {selected_time.components.hours:02}:{selected_time.components.minutes:02}:{selected_time.components.seconds:02}')
         return selected_time
 
+    @staticmethod
+    def select_offset(video_path: Union[str, Path], title: str = 'Select Offset', default_time: str = '00:04:30', preset_offset: str = '00:00:00') -> Optional[pd.Timedelta]:
+        """
+        Allow the user to visually select a timestamp offset in the video by entering it manually.
+        Returns the selected timestamp as pd.Timedelta or None if aborted.
+
+        Parameters:
+        - video_path: Path to the input video file.
+        - title: Title of the window.
+        - default_time: Default timestamp to seek initially.
+        """
+        cap = cv2.VideoCapture(str(video_path))
+
+        if not cap.isOpened():
+            raise ValueError("Error: Could not open video.")
+
+        fps = int(cap.get(cv2.CAP_PROP_FPS) + 1)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        default_frame = int(pd.to_timedelta(default_time).total_seconds() * fps)
+        current_frame = default_frame
+
+        jump_to_frame = min(int(1.5 * 3600 * fps), total_frames - 2*fps)  # Jump to 01:30:00 or end of video
+
+        window_title = title
+        window_title = window_title + ' (' + str(preset_offset) + '):' if preset_offset else window_title
+        window_title += " (e: confirm, x: edit, q: quit, w: forward 30s, s: back 30s, d: forward 1s, a: back 1s, f: jump to 01:30:00, y: back 1 min, c: forward 1 min, r: back 1 frame, t: forward 1 frame)"
+
+        while True:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Calculate the current timestamp
+            current_time = pd.to_timedelta(current_frame / fps, unit='s')
+            timestamp_str = f"{current_time.components.hours:02}:{current_time.components.minutes:02}:{current_time.components.seconds:02}"
+
+            # Display the timestamp on the frame
+            cv2.putText(frame, timestamp_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.imshow(window_title, frame)
+
+            # Ensure you click on the OpenCV window to bring it into focus
+            key = cv2.waitKey(0)
+
+            if key == ord('x'):  # 'x' to edit
+                prompt_str = "Enter timestamp (HH:MM:SS): ".replace('HH:MM:SS', str(preset_offset)) if preset_offset else "Enter timestamp (00:00:00): "
+                timestamp_input = input(prompt_str)
+                try:
+                    selected_time = pd.to_timedelta(str(timestamp_input))
+                    selected_frame = int(selected_time.total_seconds() * fps)
+                    if selected_frame >= total_frames:
+                        raise ValueError("Selected time exceeds video length.")
+                    current_frame = selected_frame
+                    break
+                except (ValueError, IndexError):
+                    pprint("Invalid timestamp format. Please enter in HH:MM:SS format.")
+                # try:
+                #     import readline
+                #     readline.set_startup_hook(lambda: readline.insert_text('00:00:00'))
+                #     try:
+                #         timestamp_input = input("Enter timestamp (HH:MM:SS): ")
+                #     finally:
+                #         readline.set_startup_hook()
+                #     if not timestamp_input:
+                #         timestamp_input = '00:00:00'
+
+                #     selected_time = pd.to_timedelta(timestamp_input)
+                #     selected_frame = int(selected_time.total_seconds() * fps)
+                #     if selected_frame >= total_frames:
+                #         raise ValueError("Selected time exceeds video length.")
+                #     current_frame = selected_frame
+                #     break
+                # except (ValueError, IndexError):
+                #     pprint("Invalid timestamp format. Please enter in HH:MM:SS format.")
+            elif key == ord('w'):
+                current_frame = min(current_frame + int(30 * fps), total_frames - 1)
+            elif key == ord('s'):
+                current_frame = max(0, current_frame - int(30 * fps))
+            elif key == ord('d'):
+                current_frame = min(current_frame + int(fps), total_frames - 1)
+            elif key == ord('a'):
+                current_frame = max(0, current_frame - int(fps))
+            elif key == ord('f'):
+                current_frame = jump_to_frame
+            elif key == ord('y'):
+                current_frame = max(0, current_frame - int(60 * fps))
+            elif key == ord('c'):
+                current_frame = min(current_frame + int(60 * fps), total_frames - 1)
+            elif key == ord('r'):
+                current_frame = max(0, current_frame - 1)
+            elif key == ord('t'):
+                current_frame = min(current_frame + 1, total_frames - 1)
+            elif key == ord('e'):  # 'f' to skip offset selection
+                cap.release()
+                cv2.destroyAllWindows()
+                selected_time = pd.to_timedelta(preset_offset) if preset_offset else pd.to_timedelta('00:00:00')
+                pprint(f"Offset confirmed: {str(selected_time)[-8:]}")
+                return selected_time
+            elif key == ord('q'):  # 'q' to quit
+                cap.release()
+                cv2.destroyAllWindows()
+                pprint(f"Selection aborted.")
+                return None
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+        selected_time = pd.to_timedelta(current_frame / fps, unit='s')
+
+        pprint(f'{title}: {selected_time.components.hours:02}:{selected_time.components.minutes:02}:{selected_time.components.seconds:02}')
+        return selected_time
+
+
+    @staticmethod
+    def select_notes(video_path: Union[str, Path], title: str = 'Select Notes', default_time: str = '', preset_note: str = None) -> Optional[str]:
+        """
+        Allow the user to visually select a timestamp and collect notes in the video by entering them manually.
+        Returns the selected notes as string or None if aborted.
+
+        Parameters:
+        - video_path: Path to the input video file.
+        - title: Title of the window.
+        - default_time: Default timestamp to seek initially.
+        """
+        cap = cv2.VideoCapture(str(video_path))
+
+        if not cap.isOpened():
+            raise ValueError("Error: Could not open video.")
+
+        fps = int(cap.get(cv2.CAP_PROP_FPS) + 1)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        default_frame = int(pd.to_timedelta(default_time).total_seconds() * fps)
+        current_frame = default_frame
+
+        jump_to_frame = min(int(1.5 * 3600 * fps), total_frames - 2*fps)  # Jump to 01:30:00 or end of video
+
+        window_title = title
+        window_title = window_title + ' (' + str(preset_note) + '):' if preset_note else window_title
+        window_title += " (e: confirm, x: edit, q: quit, w: forward 30s, s: back 30s, d: forward 1s, a: back 1s, f: jump to 01:30:00, y: back 1 min, c: forward 1 min, r: back 1 frame, t: forward 1 frame)"
+
+        while True:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Calculate the current timestamp
+            current_time = pd.to_timedelta(current_frame / fps, unit='s')
+            timestamp_str = f"{current_time.components.hours:02}:{current_time.components.minutes:02}:{current_time.components.seconds:02}"
+
+            # Display the timestamp on the frame
+            cv2.putText(frame, timestamp_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.imshow(window_title, frame)
+
+            # Ensure you click on the OpenCV window to bring it into focus
+            key = cv2.waitKey(0)
+
+            if key == ord('x'):  # 'e' to confirm
+                prompt_str = "Enter notes (free form): ".replace('free form', str(preset_note)) if preset_note else "Enter notes (free form): "
+                notes_input = input(prompt_str)
+                break
+            elif key == ord('w'):
+                current_frame = min(current_frame + int(30 * fps), total_frames - 1)
+            elif key == ord('s'):
+                current_frame = max(0, current_frame - int(30 * fps))
+            elif key == ord('d'):
+                current_frame = min(current_frame + int(fps), total_frames - 1)
+            elif key == ord('a'):
+                current_frame = max(0, current_frame - int(fps))
+            elif key == ord('f'):
+                current_frame = jump_to_frame
+            elif key == ord('y'):
+                current_frame = max(0, current_frame - int(60 * fps))
+            elif key == ord('c'):
+                current_frame = min(current_frame + int(60 * fps), total_frames - 1)
+            elif key == ord('r'):
+                current_frame = max(0, current_frame - 1)
+            elif key == ord('t'):
+                current_frame = min(current_frame + 1, total_frames - 1)
+            elif key == ord('e'):  # 'e' to confirm
+                cap.release()
+                cv2.destroyAllWindows()
+                pprint(f"Notes confirmed.")
+                selected_note = preset_note if preset_note else ''
+                return selected_note
+            elif key == ord('q'):  # 'q' to quit
+                cap.release()
+                cv2.destroyAllWindows()
+                pprint(f"Selection aborted.")
+                return None
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+        selected_notes = str(notes_input)
+
+        pprint(f'{title}: {selected_notes}')
+        return selected_notes
+        
     @staticmethod
     def select_box(video_path: Union[str, Path], timestamp: pd.Timedelta, title: str = 'Select Box',
                 step_size_horizontal: float = 0.01, step_size_vertical: float = 0.01,
@@ -255,6 +473,7 @@ class DunkaScanner:
         - default_box: Default box coordinates (x, y, width, height).
         - tracking_points: Dictionary of point names and their coordinates within the box.
         """
+       
         cap = cv2.VideoCapture(str(video_path))
 
         if not cap.isOpened():

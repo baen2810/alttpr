@@ -20,6 +20,40 @@ import pandas as pd
 import re
 
 
+# Define a function to export a dictionary to a text file
+def export_dict_to_txt(output_path, dict_name, dictionary, delete=False, fn="config_trackerpoints.py"):
+    txt_file = output_path / fn
+    # Ensure the directory exists
+    txt_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Delete the file if it exists
+    if txt_file.exists() and delete:
+        txt_file.unlink()
+    # Write the dictionary to the file, appending if the file exists
+    with open(txt_file, 'a') as f:
+        f.write(f"{dict_name} = {{\n")
+        for key, value in dictionary.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write('}\n')
+    
+    pprint(f"{dict_name} exported to {txt_file}")
+
+
+# Define a function to export a tuple to a text file
+def export_tuple_to_txt(output_path, tuple_name, tuple_value, delete=False, fn="config_trackerpoints.py"):
+    txt_file = output_path /  fn
+    # Ensure the directory exists
+    txt_file.parent.mkdir(parents=True, exist_ok=True)
+    # Delete the file if it exists
+    if txt_file.exists() and delete:
+        txt_file.unlink()
+    # Write the tuple to the file, appending if the file exists
+    with open(txt_file, 'a') as f:
+        f.write(f"{tuple_name} = {tuple_value}\n")
+    
+    pprint(f"{tuple_name} exported to {txt_file}")
+
+
 def pprintdesc(desc, tgt_len=26):
     if len(desc) <= tgt_len:
         while len(desc) < tgt_len - 1:

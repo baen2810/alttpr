@@ -18,3 +18,5 @@ tracker_box_and_points.txt
 requirements_versionfree*.txt
 alttpr/config_timestamps_tmp.py
 alttpr/config_trackerpoints_tmp.py
+alttpr/config_offset_tmp.py
+alttpr/config_notes_tmp.py
