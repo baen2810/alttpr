@@ -10,7 +10,9 @@ COLOR_LABELS_MAP_TRACKERS = {
         'YELLOW': (245, 255, 15),
         'GREY': (128, 128, 128),
         'GREY-2': (43, 134, 29),  # for Dunka Compact 2024
-        'GREY-3': (68, 221, 65),  # for Dunka Compact 2024
+        'GREY-3': (68, 221, 65),  # for Dunka Compact 2024; GREY-GREEN
+        'GREY-4': (201, 207, 59),  # for Dunka Compact 2024; GREY-YELLOW
+        'GREY-5': (184, 42, 60),  # for Dunka Compact 2024; GREY-RED
         'PURPLE': (128, 0, 128),
     },
 }
@@ -39,6 +41,7 @@ COLOR_LABELS_ITEM_TRACKER = {
         'NONE': (36, 42, 58),
         'BLUE': (144, 168, 232),
         'RED': (224, 112, 112),
+    },
     '14|BLR': {
         'NONE': (36, 42, 58),
         'BLUE': (144, 168, 232),
@@ -48,7 +51,6 @@ COLOR_LABELS_ITEM_TRACKER = {
         'NONE': (36, 42, 58),
         'BLUE': (144, 168, 232),
         'RED': (224, 112, 112),
-    },
     },
     '90|BMR': {
         'NONE': (36, 42, 58),
