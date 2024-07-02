@@ -33,7 +33,9 @@
 # TODO fix issue when selecting end time
 # TODO add third scanner points for boomerang 
 # TODO ensure DEBUG is read from env var
-# get readline to work
+# TODO get readline to work
+# TODO better shield tracking
+# TODO add tracking point subset filter to select_box() table
 
 from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path
