@@ -10,6 +10,7 @@ scripts/
 export/
 input/
 logs/
+img/
 __pycache__/
 .ipynb_checkpoints/
 alttpr*.py
