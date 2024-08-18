@@ -15,6 +15,7 @@ __pycache__/
 .ipynb_checkpoints/
 alttpr*.py
 tracker_box_and_points.txt
+stats_template_alttpr*.xlsx
 .env
 requirements_versionfree*.txt
 alttpr/config_timestamps_tmp.py

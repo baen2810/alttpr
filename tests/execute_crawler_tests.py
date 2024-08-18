@@ -6,9 +6,9 @@ module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from test_get_df_method import main as test_get_df_method
+from tests.test_get_df import main as test_get_df_method
 from test_incremental_update import main as test_incremental_update
-from test_get_metrics_and_facts_method import main as test_get_metrics_and_facts_method
+from tests.test_refresh_transforms import main as test_get_metrics_and_facts_method
 
 def main():
     test_incremental_update()
