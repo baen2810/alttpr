@@ -36,6 +36,7 @@
 # TODO get readline to work
 # TODO better shield tracking
 # TODO add tracking point subset filter to select_box() table
+# TODO check why END_TS is not properly saved to config_timestamps.py for video_name = Path("ALTTP Rando #29.10.2023.mp4")
 
 from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path

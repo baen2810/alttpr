@@ -1,6 +1,6 @@
 # ALttPR
 
-*Current Release version: 00.01.01*
+*Current Release version: 00.02.00* (check releases below)
 
 ALttPR is a collection of tools to build game analytics pipelines for 'A Link to the Past Randomizer' games.
 ALttPR is pretty cool. If you want to learn more about Randomizers and Romhacking, checkout  (https://alttpr.com/en).
@@ -60,12 +60,12 @@ cd ./alttpr
 
 ```py
 # .env
-ALTTPR_OUTPUT_FOLDER_PRIVATE="PATH_TO_PRIVATE_OUTPUTS"  # this is the default export directory for the RacetimeCrawler
-ALTTPR_OUTPUT_FOLDER_PUBLIC="PATH_TO_PUBLIC_OUTPUTS"  # use this export directory if you want to create additional exports, for example to share a subset of your data with others
-ALTTPR_OUTPUT_DFS_PUBLIC=['metrics_df', 'stats_df']  # use this variable to specify which subsets should be exported to the public output folder
+ALTTPR_OUTPUT_FOLDER_PRIVATE_PATH="PATH_TO_PRIVATE_OUTPUTS"  # this is the default export directory for the RacetimeCrawler
+ALTTPR_OUTPUT_FOLDER_PUBLIC_PATH="PATH_TO_PUBLIC_OUTPUTS"  # use this export directory if you want to create additional exports, for example to share a subset of your data with others
+ALTTPR_OUTPUT_DFS_PUBLIC_LST='metrics_df,stats_df'  # use this variable to specify which subsets should be exported to the public output folder
 ALTTPR_CRAWLER_FILE_PATH="PATH_TO_PICKLED_CRAWLER_FILE"  # path to an existing crawler that needs updating
 ALTTPR_STATS_TEMPLATE_FILE_PATH="PATH_TO_CUSTOM_STATS_TEMPLATE_FILE"  # path to a stats template file
-ALTTPR_DEBUG=FALSE
+ALTTPR_DEBUG_BOOL=FALSE
 ```
 
 # How to create your own ALttPR-RacetimeCrawler
@@ -143,6 +143,14 @@ python .\tests\execute_all_tests.py
 ```
 
 Various tests will be executed. Check console output for errors.
+
+## Releases
+
+| Version   | Date       | Changes                                                   |
+|-----------|------------|-----------------------------------------------------------|
+| v00.01.01 | 2024-07-04 | - Initial release                                         |
+| v00.02.00 | 2024-08-18 | - Racetime-Crawler-Stats can be filtered now              |
+
 
 ## License
 
