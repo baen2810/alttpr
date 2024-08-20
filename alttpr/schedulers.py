@@ -33,7 +33,7 @@
 
 from pathlib import Path
 from alttpr.crawlers import RacetimeCrawler
-from alttpr.utils import pprint, pprintdesc
+from alttpr.utils import pprint, pprintdesc, get_workspace_vars
 from logging.handlers import RotatingFileHandler
 from typing import List, Union
 from datetime import datetime, timedelta
@@ -44,6 +44,7 @@ import time
 import logging
 import traceback
 import keyboard
+import requests
 
 DEBUG = True  # bool(os.environ.get('ALTTPR_DEBUG'))  # some of the crawlers can print debug info
 pprint('DEBUG mode active') if DEBUG else None
@@ -62,10 +63,9 @@ class UnsupportedFormatError(SchedulerException):
     """File format is not supported."""
 
 
-
 class DailyScheduler:
     def __init__(self, name: str, runtimes: Union[str, List[str]], crawler: RacetimeCrawler, private_folder: Union[str, Path],
-                 public_folder: Union[str, Path], private_dfs: List[str], max_retries: int = 3, n_pages: int = None):
+                 public_folder: Union[str, Path], private_dfs: List[str], max_retries: int = 3, n_pages: int = None, mailer=None, workspace: str = 'not available'):
         self.name = name
         self.runtimes = [runtimes] if isinstance(runtimes, str) else runtimes
         self.private_folder = Path(private_folder)
@@ -74,6 +74,8 @@ class DailyScheduler:
         self.max_retries = max_retries
         self.running = True
         self.n_pages=n_pages
+        self.mailer=mailer
+        self.workspace=workspace
 
         # init crawler
         self.crawler = crawler
@@ -100,7 +102,10 @@ class DailyScheduler:
     def run_crawler(self):
         for attempt in range(self.max_retries):
             try:
-                self.logger.info(f'Starting crawl attempt {attempt + 1}')
+                # raise ValueError()
+                msg = f'Starting crawl attempt {attempt + 1}'
+                self.logger.info(msg)
+                pprint(msg, start='\n')
                 try:
                     pprint(f'--- Crawler host names: {list(self.crawler.hosts_df.host_name)}', start='\n')
                     pprint(f'--- Crawler last updated at: {self.crawler.last_updated}')
@@ -113,22 +118,35 @@ class DailyScheduler:
                 self.crawler.save()
                 self.crawler.export()
                 
-                pprint('--- Exporting racer datasets')
+                msg = '--- Exporting racer datasets'
+                self.logger.info(msg)
+                pprint(msg)                
                 for host_name in self.crawler.hosts_df.host_name:
+                    self.logger.info(self.public_folder / host_name)
                     self.crawler.set_output_path(self.public_folder / host_name)
                     self.crawler.export(dfs=self.private_dfs, host_names=host_name, dropna=True)
                 
-                pprint('Finished.')
-                self.logger.info('Crawl completed successfully')
+                msg = 'Crawl completed successfully'
+                self.logger.info(msg)
+                pprint(msg)
                 break
             except Exception as e:
-                self.logger.error(f'Error during crawl attempt {attempt + 1}: {e}', exc_info=True)
-                print(f'Error during crawl attempt {attempt + 1}: {e}')
-                print(traceback.format_exc())
+                traceback_msg = traceback.format_exc()
+                error_msg = f'Error during crawl attempt {attempt + 1}: {e}'
+                self.logger.error(error_msg + f'\n\nWorkspace:{self.workspace}\n', exc_info=True)
+                print(error_msg)
+                print(traceback_msg)
+                print(self.workspace)
                 if attempt + 1 == self.max_retries:
-                    self.logger.error('Max retries reached. Giving up.')
+                    msg = 'Max retries reached. Giving up.'
+                    self.logger.error(msg)
+                    print(msg)
+                    if self.mailer:
+                        subject = f'{e.__class__.__name__} during crawl attempt {attempt + 1}'
+                        msg = f'The following error occurred:\n{e}\nTraceback:\n{traceback_msg}\nWorkspace:\n{self.workspace}'
+                        self.mailer.send(subject, msg)
                 else:
-                    time.sleep(60)  # Wait for a minute before retrying
+                    time.sleep(60*attempt + 1)  # Wait for a minute before retrying
 
     def run(self):
         self.quit_flag = False
@@ -163,3 +181,26 @@ class DailyScheduler:
 
         # Unhook the 'q' key event when done
         keyboard.unhook_all()
+
+class MailgunMailer:
+    def __init__(self, domain: str, api_key: str, sender: str, recipients: Union[str, list]):
+        self.domain = domain
+        self.api_key = api_key
+        self.sender = sender
+        self.recipients = [recipients] if isinstance(recipients, str) else recipients
+
+    def send(self, subject: str, msg: str):
+        response = requests.post(
+            f"https://api.mailgun.net/v3/{self.domain}/messages",
+            auth=("api", self.api_key),
+            data={
+                "from": self.sender,
+                "to": self.recipients,
+                "subject": subject,
+                "text": msg
+                })
+        if response.status_code == 200:
+            pprint(f'Successfully delivered Mailgun-Mail to "{self.recipients}"')
+        else:
+            pprint(f'Unable to send Mailgun-Mail. Error code "{response.status_code}"')
+        return response
