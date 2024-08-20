@@ -110,8 +110,8 @@ class DailyScheduler:
                 self.crawler.crawl(self.n_pages)
                 
                 pprint('--- Saving crawler data')
-                self.crawler.export()
                 self.crawler.save()
+                self.crawler.export()
                 
                 pprint('--- Exporting racer datasets')
                 for host_name in self.crawler.hosts_df.host_name:

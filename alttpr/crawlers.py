@@ -524,10 +524,13 @@ class RacetimeCrawler:
         race_url = self.base_url + url
         response = self._scrape(race_url)
         class_options = [
-            {"class": "user-pop inline supporter"},
-            {"class": "user-pop inline moderator"},
             {"class": "user-pop inline"},
-            {"class": "user-pop inline supporter moderator"}
+            {"class": "user-pop inline supporter moderator"},
+            {"class": "user-pop inline supporter"},
+            {"class": "user-pop inline moderator"}, 
+            {"class": "user-pop inline staff supporter moderator"},
+            {"class": "user-pop inline staff supporter"},
+            {"class": "user-pop inline staff moderator"},    
         ]
         if response.status_code == 200:
             rsoup = BeautifulSoup(response.content, "html.parser")
