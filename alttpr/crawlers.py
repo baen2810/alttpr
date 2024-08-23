@@ -455,15 +455,18 @@ class RacetimeCrawler:
 
     def get_stats(self):
         try:
-            df_stats = pd.read_excel(self.stats_template_path).dropna(subset=['ID', 'Kategorie', 'Template'])
+            df_stats_static_cols = ['ID', 'Kategorie', 'Template']
+            df_stats = pd.read_excel(self.stats_template_path).dropna(subset=df_stats_static_cols)
+            for host_name in list(self.hosts_df.host_name):
+                if host_name not in df_stats.columns:
+                    df_stats[host_name] = 'x'              
+            df_stats = df_stats[df_stats_static_cols + list(self.hosts_df.host_name)]
             df_stats.ID = df_stats.ID.astype(int)
             pprint('Creating stats')
         except Exception as e:
             raise StatsError(f'unable to retrieve stats: {self.stats_template_path=}') from e
         for host_name in list(self.hosts_df.host_name):
             try:
-                if host_name not in df_stats.columns:
-                    df_stats[host_name] = 'x'
                 metrics_dict = dict(zip(self.metrics_df.metric, self.metrics_df[host_name]))
                 df_stats[host_name] = [t if not(pd.isna(h)) else np.nan for t, h in zip(df_stats.Template, df_stats[host_name])]
                 df_stats[host_name] = df_stats[host_name].str.replace('<host_name>', host_name)
@@ -483,20 +486,27 @@ class RacetimeCrawler:
             except Exception as e:
                 raise StatsError(f'unable to retrieve stats: {host_name=}, {self.stats_template_path=}') from e
         self.stats_df = df_stats
+
     def crawl(self, n_pages: int = None, max_races: int = None) -> None:
         self._get_hosts()
+        pprint(f'Required host names to parse: {list(self.hosts_df.host_name)}')
         self._get_race_ids(n_pages)
         if max_races:
             self.race_ids = self.race_ids[:max_races]
             pprint(f'>>>>> WARNING: Crawling was explicitly limited to {max_races=}')
         race_ids_crawled = self._get_races_data()
-        if race_ids_crawled > 0:
-            self._parse_race_info()
-            self.get_metrics()
-            self.get_stats()
+        host_names_changed_flag, host_names_missing, host_names_invalid, host_names_valid = self._validate_host_names()
+        if host_names_changed_flag or race_ids_crawled > 0:
+            if host_names_changed_flag:
+                pprint('Host names require update:')
+                pprint(f'Valid host names: {host_names_valid}')
+                pprint(f'Invalid host names: {host_names_invalid}. Will be removed from metrics_df and stats_df') if len (host_names_invalid) > 0 else None
+                pprint(f'Missing host names: {host_names_missing}. Will be added to metrics_df and stats_df') if len (host_names_missing) > 0 else None
+                pprint(f'No data will be deleted from races_df')
+            self.refresh_transforms()
         pprint(f'Number of race ids in races_df ({len(self._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(self.race_ids)})') if len(self._list_ids_in_races_df()) != len(self.race_ids) else None
         pprint(f'Number of columns in races_df ({len(self.races_df.columns)}) does not match number of cols in self.races_df_cols_cr + _tf ({len(self.races_df_cols_cr) + len(self.races_df_cols_tf)})') if len(self.races_df_cols_cr) + len(self.races_df_cols_tf) != len(self.races_df.columns) else None
-            
+                
     def _get_hosts(self) -> None:
         all_hosts_data = []
         for host_id in self.host_ids:
@@ -553,6 +563,23 @@ class RacetimeCrawler:
 
     def _list_ids_in_races_df(self):
         return list(sorted(set(self.races_df.race_id)))
+
+    def _list_host_names_in_hosts_df(self):
+        return list(sorted(set(self.hosts_df.host_name)))
+ 
+    def _list_host_names_in_metrics_df(self):
+        return list(sorted(set([c for c in self.metrics_df.columns if c not in ['scope', 'forfeits', 'win_filter', 'name', 'aggregation', 'pivoted_by', 'pivot_label', 'metric']])))
+    
+    def _list_host_names_in_stats_df(self):
+        return list(sorted(set([c for c in self.stats_df.columns if c not in ['ID', 'Kategorie', 'Template']])))
+    
+    def _validate_host_names(self):
+        host_names_valid = self._list_host_names_in_hosts_df()
+        host_names_existing = list(sorted(set(self._list_host_names_in_metrics_df() + self._list_host_names_in_stats_df())))
+        host_names_missing = [x for x in host_names_valid if not x in host_names_existing]
+        host_names_invalid = [x for x in host_names_existing if not x in host_names_valid]
+        update_required = True if len(host_names_missing + host_names_invalid) != 0 else False
+        return update_required, host_names_missing, host_names_invalid, host_names_valid
 
     def _get_race_data(self, url: str) -> pd.DataFrame:
         try:

@@ -2,8 +2,6 @@
 .venv/
 .conda/
 .venv_tst/
-# Logfiles
-logs/
 tests/data/temp_data/
 tests/data/_tmp/
 scripts/
@@ -13,7 +11,7 @@ logs/
 img/
 __pycache__/
 .ipynb_checkpoints/
-alttpr*.py
+# alttpr*.py
 tracker_box_and_points.txt
 stats_template_alttpr*.xlsx
 .env
