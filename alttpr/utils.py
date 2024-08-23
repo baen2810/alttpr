@@ -56,7 +56,7 @@ def get_workspace_vars(local_vars, filter_vars=None, exclude_vars=['__builtins__
     workspace_str = '\n'
     for var_name, value in local_vars.items():
         if value and not(callable(value)) and not(isinstance(value, types.ModuleType)) and var_name not in exclude_vars and value in filter_vars:  # and value[:2] != '__' 
-            workspace_str += f"{var_name}={value}\n"
+            workspace_str += f">> {var_name}={value}\n"
     return workspace_str
 
 # Define a function to export a dictionary to a text file

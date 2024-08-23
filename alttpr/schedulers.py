@@ -65,7 +65,7 @@ class UnsupportedFormatError(SchedulerException):
 
 class DailyScheduler:
     def __init__(self, name: str, runtimes: Union[str, List[str]], crawler: RacetimeCrawler, private_folder: Union[str, Path],
-                 public_folder: Union[str, Path], private_dfs: List[str], max_retries: int = 3, n_pages: int = None, mailer=None, workspace: str = 'not available'):
+                 public_folder: Union[str, Path], private_dfs: List[str], max_retries: int = 3, n_pages: int = None, mailer=None, workspace: str = 'not available', logs_dir:Union[str, Path]=None):
         self.name = name
         self.runtimes = [runtimes] if isinstance(runtimes, str) else runtimes
         self.private_folder = Path(private_folder)
@@ -76,6 +76,7 @@ class DailyScheduler:
         self.n_pages=n_pages
         self.mailer=mailer
         self.workspace=workspace
+        self.logs_dir=Path(os.getcwd(), 'logs', self.name) if logs_dir is None else logs_dir
 
         # init crawler
         self.crawler = crawler
@@ -85,10 +86,10 @@ class DailyScheduler:
         self.setup_logging()
 
     def setup_logging(self):
-        logs_dir = Path(os.getcwd(), 'logs', self.name)
-        logs_dir.mkdir(parents=True, exist_ok=True)
+        # logs_dir = Path(os.getcwd(), 'logs', self.name)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
         
-        log_file = logs_dir / 'daily_scheduler.log'
+        log_file = self.logs_dir / 'daily_scheduler.log'
         pprint(f'Logging to: {log_file}')
         
         logging.basicConfig(
@@ -126,9 +127,10 @@ class DailyScheduler:
                     self.crawler.set_output_path(self.public_folder / host_name)
                     self.crawler.export(dfs=self.private_dfs, host_names=host_name, dropna=True)
                 
-                msg = 'Crawl completed successfully'
+                msg = 'Successfully completed crawl'
                 self.logger.info(msg)
                 pprint(msg)
+                self.mailer.send(subject=msg, msg=f'Workspace:\n{self.workspace}')
                 break
             except Exception as e:
                 traceback_msg = traceback.format_exc()
