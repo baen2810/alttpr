@@ -76,7 +76,7 @@ class DailyScheduler:
         self.n_pages=n_pages
         self.mailer=mailer
         self.workspace=workspace
-        self.logs_dir=Path(os.getcwd(), 'logs', self.name) if logs_dir is None else logs_dir
+        self.logs_dir=Path(os.getcwd(), 'logs', self.name) if logs_dir is None else Path(logs_dir)
 
         # init crawler
         self.crawler = crawler
