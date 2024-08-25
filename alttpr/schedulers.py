@@ -33,7 +33,11 @@
 
 from pathlib import Path
 from alttpr.crawlers import RacetimeCrawler
+<<<<<<< HEAD
 from alttpr.utils import pprint, pprintdesc, get_workspace_vars
+=======
+from alttpr.utils import pprint, pprintdesc
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
 from logging.handlers import RotatingFileHandler
 from typing import List, Union
 from datetime import datetime, timedelta
@@ -65,7 +69,11 @@ class UnsupportedFormatError(SchedulerException):
 
 class DailyScheduler:
     def __init__(self, name: str, runtimes: Union[str, List[str]], crawler: RacetimeCrawler, private_folder: Union[str, Path],
+<<<<<<< HEAD
                  public_folder: Union[str, Path], private_dfs: List[str], max_retries: int = 3, n_pages: int = None, mailer=None, workspace: str = 'not available', logs_dir:Union[str, Path]=None):
+=======
+                 public_folder: Union[str, Path], private_dfs: List[str], max_retries: int = 3, n_pages: int = None):
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
         self.name = name
         self.runtimes = [runtimes] if isinstance(runtimes, str) else runtimes
         self.private_folder = Path(private_folder)
@@ -74,9 +82,12 @@ class DailyScheduler:
         self.max_retries = max_retries
         self.running = True
         self.n_pages=n_pages
+<<<<<<< HEAD
         self.mailer=mailer
         self.workspace=workspace
         self.logs_dir=Path(os.getcwd(), 'logs', self.name) if logs_dir is None else Path(logs_dir)
+=======
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
 
         # init crawler
         self.crawler = crawler
@@ -89,7 +100,11 @@ class DailyScheduler:
         # logs_dir = Path(os.getcwd(), 'logs', self.name)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         
+<<<<<<< HEAD
         log_file = self.logs_dir / 'daily_scheduler.log'
+=======
+        log_file = logs_dir / 'daily_scheduler.log'
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
         pprint(f'Logging to: {log_file}')
         
         logging.basicConfig(
@@ -103,10 +118,14 @@ class DailyScheduler:
     def run_crawler(self):
         for attempt in range(self.max_retries):
             try:
+<<<<<<< HEAD
                 # raise ValueError()
                 msg = f'Starting crawl attempt {attempt + 1}'
                 self.logger.info(msg)
                 pprint(msg, start='\n')
+=======
+                self.logger.info(f'Starting crawl attempt {attempt + 1}')
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
                 try:
                     pprint(f'--- Crawler host names: {list(self.crawler.hosts_df.host_name)}', start='\n')
                     pprint(f'--- Crawler last updated at: {self.crawler.last_updated}')
@@ -133,12 +152,18 @@ class DailyScheduler:
                 self.mailer.send(subject=msg, msg=f'Workspace:\n{self.workspace}')
                 break
             except Exception as e:
+<<<<<<< HEAD
                 traceback_msg = traceback.format_exc()
                 error_msg = f'Error during crawl attempt {attempt + 1}: {e}'
                 self.logger.error(error_msg + f'\n\nWorkspace:{self.workspace}\n', exc_info=True)
                 print(error_msg)
                 print(traceback_msg)
                 print(self.workspace)
+=======
+                self.logger.error(f'Error during crawl attempt {attempt + 1}: {e}', exc_info=True)
+                print(f'Error during crawl attempt {attempt + 1}: {e}')
+                print(traceback.format_exc())
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
                 if attempt + 1 == self.max_retries:
                     msg = 'Max retries reached. Giving up.'
                     self.logger.error(msg)
@@ -183,6 +208,7 @@ class DailyScheduler:
 
         # Unhook the 'q' key event when done
         keyboard.unhook_all()
+<<<<<<< HEAD
 
 class MailgunMailer:
     def __init__(self, domain: str, api_key: str, sender: str, recipients: Union[str, list]):
@@ -206,3 +232,5 @@ class MailgunMailer:
         else:
             pprint(f'Unable to send Mailgun-Mail. Error code "{response.status_code}"')
         return response
+=======
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')

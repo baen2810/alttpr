@@ -39,10 +39,14 @@ def dotenv2dict(dotenv_var):
     dotenv_dict = {}
     for k,v in dotenv_var.items():
         v = None if v=="None" else v
+<<<<<<< HEAD
         if v == "True":
             v = True
         elif v == "False":
             v = False
+=======
+        v = bool(v) if v in ["True", "False"] else v
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
         try:
             if type(v).__name__ != 'bool':
                 v = int(v)
@@ -54,6 +58,7 @@ def dotenv2dict(dotenv_var):
 def dotenv2lst(dotenv_var):
     return [x.strip() for x in os.getenv(dotenv_var).split(',')]
 
+<<<<<<< HEAD
 def get_workspace_vars(local_vars, filter_vars=None, exclude_vars=['__builtins__', '__name__']):
     filter_vars = filter_vars if filter_vars else local_vars.values()
     workspace_str = '\n'
@@ -61,6 +66,13 @@ def get_workspace_vars(local_vars, filter_vars=None, exclude_vars=['__builtins__
         if value and not(callable(value)) and not(isinstance(value, types.ModuleType)) and var_name not in exclude_vars and value in filter_vars:  # and value[:2] != '__' 
             workspace_str += f">> {var_name}={value}\n"
     return workspace_str
+=======
+def print_workspace(local_vars, filter_vars=None, exclude_vars=['__builtins__', '__name__']):
+    filter_vars = filter_vars if filter_vars else local_vars.values()
+    for var_name, value in local_vars.items():
+        if value and not(callable(value)) and not(isinstance(value, types.ModuleType)) and var_name not in exclude_vars and value in filter_vars:  # and value[:2] != '__' 
+            pprint(f"{var_name}={value}")
+>>>>>>> 1fb60a3 (Merge branch 'feat/add-parametrized-metrics')
 
 # Define a function to export a dictionary to a text file
 def export_dict_to_txt(output_path, dict_name, dictionary, delete=False, fn="config_trackerpoints.py"):
