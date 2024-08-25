@@ -667,7 +667,8 @@ class RacetimeCrawler:
             df['race_timer_sec'] = [int(r.split(':')[0])*60*60 + int(r.split(':')[1])*60 + int(r.split(':')[2]) for r in df.race_timer]
             df['race_n_forfeits'] = df.set_index('race_id').join(df[df.entrant_place.isna()][['race_id', 'race_goal']].groupby('race_id').count(), rsuffix='_cnt').reset_index().race_goal_cnt.fillna(0).astype(int)
             df['race_last_place'] = [e - f for f, e in zip(df.race_n_forfeits, df.race_n_entrants)]
-            df['is_game'] = [1 if self.game_filter in r.lower() else 0 for r in df.race_id]
+            # df['is_game'] = [1 if self.game_filter.lower() in r.lower() else 0 for r in df.race_id]
+            df['is_game'] = df.race_id.str.split('/',expand=True)[1]
             df['race_start_weekday'] = df.race_start.dt.weekday.astype(str).replace(self.weekday_dict_EN)  # 0=Montag
             df['entrant_has_medal'] = pd.to_datetime([d.date() if r <= 3 else NAN_VALUE for d, r in zip(df.race_start, df.entrant_rank)])
             df['entrant_has_won'] = pd.to_datetime([d.date() if r <= 1 else NAN_VALUE for d, r in zip(df.race_start, df.entrant_rank)])
@@ -726,13 +727,17 @@ class RacetimeCrawler:
                 tournament_lst += [tournament]
             df['race_tournament'] = tournament_lst
             df.race_tournament = ['Community Race' if e >= self.community_race_thres and type(t) == float else t for e,t in zip(df.race_n_entrants, df.race_tournament)]
+            df.race_tournament = [f'Community Race (<{self.community_race_thres})' if e < self.community_race_thres and t == 'Community Race' else t for e,t in zip(df.race_n_entrants, df.race_tournament)]
+            df.race_tournament = ['Unknown 1on1' if e == 2 and type(t) == float else t for e,t in zip(df.race_n_entrants, df.race_tournament)]
+            df.race_tournament = ['Unknown 1on1on1' if e == 3 and type(t) == float else t for e,t in zip(df.race_n_entrants, df.race_tournament)]
+            df.race_tournament = ['Unknown 2on2' if e == 4 and type(t) == float else t for e,t in zip(df.race_n_entrants, df.race_tournament)]
             df['race_category'] = [r if r in ['German Weekly', 'Community Race'] else 'Tournament' for r in df.race_tournament]
             df['race_group'] = ['Community-/Weekly-Race' if r in ['German Weekly', 'Community Race'] else 'Tournament' for r in df.race_tournament]
             df = df.sort_values(['race_start', 'entrant_place'], ascending=[False, True]).reset_index(drop=True)
             # TODO alles in einen df und dazu noch race id und tournament und game filter
-            self.race_mode_map_df = df[['race_mode', 'race_info_norm']].drop_duplicates().sort_values(['race_mode', 'race_info_norm'])
-            self.race_mode_simple_map_df = df[['race_mode_simple', 'race_mode']].drop_duplicates().sort_values(['race_mode_simple', 'race_mode'])
-            self.race_tournament_map_df = df[['race_group', 'race_category', 'race_tournament', 'race_info_norm']].drop_duplicates().sort_values(['race_group', 'race_category', 'race_tournament', 'race_info_norm'])
+            self.race_mode_map_df = df[['is_game', 'race_tournament', 'race_category', 'race_group', 'race_mode', 'race_info_norm']].drop_duplicates().sort_values(['race_tournament', 'race_category', 'race_group', 'race_mode', 'race_info_norm'])
+            self.race_mode_simple_map_df = df[['is_game', 'race_group', 'race_mode_simple', 'race_mode']][df.is_game==self.game_filter.lower()].drop_duplicates().sort_values(['race_group', 'race_mode_simple', 'race_mode'])
+            self.race_tournament_map_df = df[['is_game', 'race_group', 'race_category', 'race_tournament', 'race_info_norm', 'race_n_entrants']][df.is_game==self.game_filter.lower()].drop_duplicates().sort_values(['race_group', 'race_category', 'race_tournament', 'race_info_norm'])
             self.races_df_cols_tf = [c for c in df.columns if c not in self.races_df_cols_cr]
             self.races_df = df
             self.last_updated = pd.Timestamp.now()
