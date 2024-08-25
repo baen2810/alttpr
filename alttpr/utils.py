@@ -39,7 +39,10 @@ def dotenv2dict(dotenv_var):
     dotenv_dict = {}
     for k,v in dotenv_var.items():
         v = None if v=="None" else v
-        v = bool(v) if v in ["True", "False"] else v
+        if v == "True":
+            v = True
+        elif v == "False":
+            v = False
         try:
             if type(v).__name__ != 'bool':
                 v = int(v)
