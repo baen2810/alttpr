@@ -1,10 +1,6 @@
 # ALttPR
 
-<<<<<<< HEAD
 *Current Release version: 00.02.02 (2024-08-25)* (check releases below)
-=======
-*Current Release version: 00.02.00* (check releases below)
->>>>>>> 83bd684 (Release version 00.02.00)
 
 ALttPR is a collection of tools to build game analytics pipelines for 'A Link to the Past Randomizer' games.
 ALttPR is pretty cool. If you want to learn more about Randomizers and Romhacking, checkout  (https://alttpr.com/en).
