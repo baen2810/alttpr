@@ -28,6 +28,7 @@
 
 """Racetime.gg Crawler"""
 
+# TODO check negative values for race_last_place
 # TODO add_race() method and check error in race 'https://racetime.gg/ootr/adequate-starfox-1938'
 # TODO improved parsing and transform speed
 # TODO implement game filter early while parsing
@@ -285,7 +286,7 @@ class RacetimeCrawler:
         for window_name, window in self.windows_dict.items():
             for forfeits_name, drop_forfeits in self.drop_forfeits_dict.items():
                 for entrant_has_medal_name, entrant_has_medal in self.entrant_has_medal_dict.items():
-                    # if window_name=='last_30_days' and forfeits_name=='forfeits_included' and entrant_has_medal_name=='all_races':
+                    # if window_name=='total' and forfeits_name=='forfeits_included' and entrant_has_medal_name=='all_races':
                     #     print('now')
                     pprint(f'Creating metrics for {window_name=}, {forfeits_name=}, {entrant_has_medal_name=}')
                     df_tmp = self._get_metrics_wrapped(windowed=window, drop_forfeits=drop_forfeits, entrant_has_medal=entrant_has_medal)
@@ -665,9 +666,14 @@ class RacetimeCrawler:
             df.entrant_rank = df.entrant_rank.replace(10_000, NAN_VALUE)
             df['race_info_norm'] = [clean_race_info_str(txt) for txt in df.race_info]
             df['race_timer_sec'] = [int(r.split(':')[0])*60*60 + int(r.split(':')[1])*60 + int(r.split(':')[2]) for r in df.race_timer]
-            df['race_n_forfeits'] = df.set_index('race_id').join(df[df.entrant_place.isna()][['race_id', 'race_goal']].groupby('race_id').count(), rsuffix='_cnt').reset_index().race_goal_cnt.fillna(0).astype(int)
+            # df = df_bck.copy()
+            df_n_finished = df.dropna(subset='entrant_finishtime')[['race_id', 'race_start']].groupby('race_id').count().sort_values('race_id').rename(columns={'race_start': 'race_n_finished'})
+            df = df.set_index('race_id').join(df_n_finished, how='left').reset_index()
+            df.race_n_finished = df.race_n_finished.fillna(0)
+            df['race_n_forfeits'] = df['race_n_entrants'] - df['race_n_finished']
+            # df['race_n_finished'] = df.set_index('race_id').join(df.dropna(subset='entrant_finishtime')[['race_id', 'race_start']].groupby('race_id').count(), rsuffix='_cnt', how='left').reset_index().race_start_cnt.fillna(0).astype(int)
+            # df['race_n_forfeits'] = list(df.set_index('race_id').join(df[~df.entrant_place.isna()][['race_id', 'race_start']].groupby('race_id').count(), rsuffix='_cnt', how='left').reset_index().race_start_cnt.fillna(0).astype(int))
             df['race_last_place'] = [e - f for f, e in zip(df.race_n_forfeits, df.race_n_entrants)]
-            # df['is_game'] = [1 if self.game_filter.lower() in r.lower() else 0 for r in df.race_id]
             df['is_game'] = df.race_id.str.split('/',expand=True)[1]
             df['race_start_weekday'] = df.race_start.dt.weekday.astype(str).replace(self.weekday_dict_EN)  # 0=Montag
             df['entrant_has_medal'] = pd.to_datetime([d.date() if r <= 3 else NAN_VALUE for d, r in zip(df.race_start, df.entrant_rank)])
@@ -684,9 +690,6 @@ class RacetimeCrawler:
             dfs = pd.read_excel(self.parse_template_path, sheet_name=['race-mode-definitions', 'race-mode-replaces', 'race-mode-simple-mapping', 'race-mode-simple-replaces', 'race-tournament-mapping', 'race-tournament-replaces'])
             for i, row in dfs['race-mode-definitions'].iterrows():
                 df[row.colname] = [1 if any([k.strip() in r.lower() for k in row.keyword_lst.split(',')]) else 0 for r in df.race_info_norm]
-            # df['mode_bigkeyshuffle'] = [1 if 'bigkeyshuffle' in r or 'bkshuffle' in r.split('(')[0].lower().replace('_', '').replace(' ', '') else 0 for r in df.race_info_norm]
-            # df = df[list(sorted(set(df.columns)))]
-            # TODO check bigkeyshuffle mode
             df_sum_mode_flags = df[[c for c in df.columns if 'mode' == c[:4]]]
             df['sum_modes'] = df_sum_mode_flags.sum(axis=1)
             # Mode
