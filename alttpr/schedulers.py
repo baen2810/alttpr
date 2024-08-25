@@ -30,6 +30,7 @@
 
 # TODO create tests
 # add prints to retry attempts including error msg for faster analysis
+# add prints to retry attempts including error msg for faster analysis
 
 from pathlib import Path
 from alttpr.crawlers import RacetimeCrawler
@@ -47,7 +48,9 @@ import schedule
 import time
 import logging
 import traceback
+import traceback
 import keyboard
+import requests
 import requests
 
 DEBUG = True  # bool(os.environ.get('ALTTPR_DEBUG'))  # some of the crawlers can print debug info
@@ -91,12 +94,15 @@ class DailyScheduler:
 
         # init crawler
         self.crawler = crawler
+        self.crawler = crawler
         self.crawler.set_output_path(self.private_folder)
         
         # log
         self.setup_logging()
 
     def setup_logging(self):
+        # logs_dir = Path(os.getcwd(), 'logs', self.name)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
         # logs_dir = Path(os.getcwd(), 'logs', self.name)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         
@@ -136,16 +142,26 @@ class DailyScheduler:
                 
                 pprint('--- Saving crawler data')
                 self.crawler.save()
+                self.crawler.save()
                 self.crawler.export()
                 
                 msg = '--- Exporting racer datasets'
                 self.logger.info(msg)
                 pprint(msg)                
+                msg = '--- Exporting racer datasets'
+                self.logger.info(msg)
+                pprint(msg)                
                 for host_name in self.crawler.hosts_df.host_name:
+                    self.logger.info(self.public_folder / host_name)
                     self.logger.info(self.public_folder / host_name)
                     self.crawler.set_output_path(self.public_folder / host_name)
                     self.crawler.export(dfs=self.private_dfs, host_names=host_name, dropna=True)
+                    self.crawler.export(dfs=self.private_dfs, host_names=host_name, dropna=True)
                 
+                msg = 'Successfully completed crawl'
+                self.logger.info(msg)
+                pprint(msg)
+                self.mailer.send(subject=msg, msg=f'Workspace:\n{self.workspace}')
                 msg = 'Successfully completed crawl'
                 self.logger.info(msg)
                 pprint(msg)
@@ -172,10 +188,25 @@ class DailyScheduler:
                         subject = f'{e.__class__.__name__} during crawl attempt {attempt + 1}'
                         msg = f'The following error occurred:\n{e}\nTraceback:\n{traceback_msg}\nWorkspace:\n{self.workspace}'
                         self.mailer.send(subject, msg)
+                    msg = 'Max retries reached. Giving up.'
+                    self.logger.error(msg)
+                    print(msg)
+                    if self.mailer:
+                        subject = f'{e.__class__.__name__} during crawl attempt {attempt + 1}'
+                        msg = f'The following error occurred:\n{e}\nTraceback:\n{traceback_msg}\nWorkspace:\n{self.workspace}'
+                        self.mailer.send(subject, msg)
                 else:
+                    time.sleep(60*attempt + 1)  # Wait for a minute before retrying
                     time.sleep(60*attempt + 1)  # Wait for a minute before retrying
 
     def run(self):
+        self.quit_flag = False
+
+        def on_quit():
+            self.quit_flag = True
+
+        keyboard.on_press_key("q", lambda _: on_quit())  # Register event listener for 'q' key
+
         self.quit_flag = False
 
         def on_quit():
@@ -195,10 +226,16 @@ class DailyScheduler:
                     self.running = False
                     break
 
+                if self.quit_flag:
+                    print("\nScheduler aborted by user.")
+                    self.running = False
+                    break
+
                 next_run = schedule.next_run()
                 time_left = next_run - datetime.now()
                 # Remove milliseconds
                 time_left = str(time_left).split('.')[0]
+                print(pprintdesc(f"\rTime left until next run (press 'q' to abort): {time_left}"), end='', flush=True)
                 print(pprintdesc(f"\rTime left until next run (press 'q' to abort): {time_left}"), end='', flush=True)
                 schedule.run_pending()
                 time.sleep(1)
