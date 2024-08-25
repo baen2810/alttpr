@@ -69,6 +69,7 @@ def get_workspace_vars(local_vars, filter_vars=None, exclude_vars=['__builtins__
 =======
 def print_workspace(local_vars, filter_vars=None, exclude_vars=['__builtins__', '__name__']):
     filter_vars = filter_vars if filter_vars else local_vars.values()
+    workspace_str = '\n'
     for var_name, value in local_vars.items():
         if value and not(callable(value)) and not(isinstance(value, types.ModuleType)) and var_name not in exclude_vars and value in filter_vars:  # and value[:2] != '__' 
             pprint(f"{var_name}={value}")
