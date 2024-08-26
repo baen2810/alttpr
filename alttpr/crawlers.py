@@ -465,6 +465,7 @@ class RacetimeCrawler:
             df_stats = df_stats[df_stats_static_cols + list(self.hosts_df.host_name)]
             df_stats.ID = df_stats.ID.astype(int)
             pprint('Creating stats')
+            pprint(f'Stats template file: {self.stats_template_path}')
         except Exception as e:
             raise StatsError(f'unable to retrieve stats: {self.stats_template_path=}') from e
         for host_name in list(self.hosts_df.host_name):
@@ -473,6 +474,7 @@ class RacetimeCrawler:
                 df_stats[host_name] = [t if not(pd.isna(h)) else np.nan for t, h in zip(df_stats.Template, df_stats[host_name])]
                 df_stats[host_name] = df_stats[host_name].str.replace('<host_name>', host_name)
                 df_stats[host_name] = df_stats[host_name].str.replace('<game_filter>', self.game_filter)
+                df_stats[host_name] = df_stats[host_name].str.replace('<LAST_UPDATED>', self.last_updated.strftime('%d.%m.%Y'))
                 for k, v in tqdm(metrics_dict.items(), desc=pprintdesc(f'Host \'{host_name}\'')):
                     df_stats[host_name] = [f.replace(k, str(v)) if not(pd.isna(f)) else f for f in df_stats[host_name]]
                 if self.lang=='DE':
@@ -485,6 +487,8 @@ class RacetimeCrawler:
                     df_stats[host_name] = [f.replace('vor 1 Tag(en)', 'gestern').replace('vor 1 Tag', 'gestern') if not(pd.isna(f)) else f for f in df_stats[host_name]]
                     df_stats[host_name] = [f.replace('vor 2 Tag(en)', 'vorgestern').replace('vor 2 Tagen', 'vorgestern') if not(pd.isna(f)) else f for f in df_stats[host_name]]
                     df_stats[host_name] = [f.replace('Tag(en)', 'Tagen') if not(pd.isna(f)) else f for f in df_stats[host_name]]
+                    df_stats[host_name] = [f.replace(', nan (NaT) und nan (NaT)', '') if not(pd.isna(f)) else f for f in df_stats[host_name]]
+                    df_stats[host_name] = [f.replace(' und nan (NaT)', '') if not(pd.isna(f)) else f for f in df_stats[host_name]]
             except Exception as e:
                 raise StatsError(f'unable to retrieve stats: {host_name=}, {self.stats_template_path=}') from e
         self.stats_df = df_stats
@@ -803,7 +807,7 @@ class RacetimeCrawler:
             # check NA status
             df_tmp = df_stats.copy()
             for h in host_names:
-                df_tmp[h] = [1 if '<' in x and '>' in x and '|' in x else 0 for x in df_tmp[h]]
+                df_tmp[h] = [1 if ('<' in x and '>' in x and '|' in x) or 'NaT' in x or 'NaN' in x or ' nan ' in x else 0 for x in df_tmp[h]]
             df_tmp = df_tmp.replace(0, np.nan)
             try:
                 df_na = df_tmp.drop(columns=['Template'])
@@ -812,7 +816,7 @@ class RacetimeCrawler:
             df_na = df_na.drop(columns=['ID']).groupby('Kategorie').sum().reset_index()
             df_na = df_na.replace(0, np.nan).dropna(how='all', subset=host_names).reset_index(drop=True)
             if not(dropna) and df_na.shape[0] > 0:
-                pprint('Found NAs')
+                pprint('Found unresolved metrics, NaNs and/or NaTs')
                 print(df_na)
             # export       
             if dropna:
