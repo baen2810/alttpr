@@ -116,6 +116,7 @@ class DailyScheduler:
                 self.crawler.crawl(self.n_pages)
                 
                 pprint('--- Saving crawler data')
+                self.crawler.set_output_path(self.private_folder)
                 self.crawler.save()
                 self.crawler.export()
                 
