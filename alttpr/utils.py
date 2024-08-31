@@ -174,6 +174,28 @@ def ts2str(ts):
     return ts.strftime('%H:%M:%S')
 
 
+def min2tstr(x):
+    h = int(x / 60)
+    m = int(x) - h * 60
+    s = int((x - int(x)) * 60)
+    return f'{str(h).zfill(2)}:{str(m).zfill(2)}:{str(s).zfill(2)}'
+
+
+def sec2tstr(x):
+    x = x / 60
+    return min2tstr(x)
+
+
+def td2int(td, unit='minutes', n_digits=2):
+    if unit == 'minutes':
+        td_int = round(td.seconds / 60, n_digits)
+    elif unit == 'seconds':
+        td_int = round(td.seconds, n_digits)
+    else:
+        raise ValueError(f'Unknown parameter: {unit=}')
+    return td_int
+
+
 def plistmatch(a, b):
     '''
     Returns three lists:

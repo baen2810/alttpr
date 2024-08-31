@@ -3,10 +3,97 @@ Collection of plots.
 
 """
 
+import sys
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Optional, List, Tuple
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from utils import min2tstr
+
+def format_df_table(df, int_cols=[], min2tstr_cols=[], pct_cols=[], round_cols=[], combine_cols=[], round_digits=2):
+    df_out = df.copy()
+    for c in int_cols:
+        df_out[c] = round(df_out[c], 0).astype(int)
+    for c in min2tstr_cols:
+        df_out[c] = [min2tstr(x) for x in df_out[c]]
+    for c in round_cols:
+        df_out[c] = [round(x, round_digits) for x in df_out[c]]
+    for c in pct_cols:
+        df_out[c] = [str(int(x*100)) + '%' for x in df_out[c]]
+    for c in combine_cols:
+        colname, c1, c2 = c
+        df_out[colname] = [str(x) + ' - ' + str(y) for x, y in zip(df_out[c1], df_out[c2])]
+        df_out = df_out.drop(columns=[c1, c2])
+    return df_out
+
+
+def plot_table(df, title=None, legend=None, text_size=8, legend_x=0.125, legend_y=0.04, legend_font_size_factor=0.45):
+    # Add a dummy row to the DataFrame to be able to set its top border to the appropriate style
+    dummy_row = pd.DataFrame([['' for _ in range(len(df.columns))]], columns=df.columns)
+    df = pd.concat([df, dummy_row], ignore_index=True)
+    
+    # Calculate dynamic figure size based on the DataFrame dimensions
+    num_rows, num_cols = df.shape
+    figsize = (num_cols * 1.5, num_rows * 0.1 + 0.5)  # Adjust multipliers as needed for padding
+
+    # Creating a table with matplotlib
+    fig, ax = plt.subplots(figsize=figsize)  # Set dynamic figure size
+    ax.axis('tight')
+    ax.axis('off')
+    table_data = df.values
+    columns = df.columns
+
+    # Set font properties
+    plt.rcParams['font.family'] = 'Georgia'
+
+    # Create the table
+    table = ax.table(cellText=table_data, colLabels=columns, cellLoc='center', loc='center')
+
+    # Set font size for the table cells
+    table.auto_set_font_size(False)
+    table.set_fontsize(text_size)
+
+    # Remove all borders first
+    for i in range(len(table_data) + 1):  # +1 to include the header row
+        for j in range(len(columns)):
+            cell = table[i, j]
+            cell.set_edgecolor('white')  # Remove border by setting to white or setting width to 0
+            cell.set_linewidth(0)
+
+    # Set only the bottom border for each cell in the specified rows
+    def set_bold_bottom_border(table, row):
+        for col in range(len(columns)):
+            cell = table[row, col]
+            cell.set_edgecolor('black')
+            cell.set_linewidth(2)  # Set bold bottom border
+            cell.visible_edges = "B"  # Only display the bottom edge
+            if row == 0:  # Bold text for header row
+                cell.set_text_props(weight='bold')
+
+    # Apply the bold bottom border and bold text to the first and last rows
+    set_bold_bottom_border(table, 0)  # Header row
+    set_bold_bottom_border(table, len(table_data) - 1)  # Last row
+
+    # Center all column values
+    for i in range(1, len(table_data) + 1):  # Start from 1 to skip the header row
+        for j in range(len(columns)):
+            cell = table[i, j]
+            cell.set_text_props(ha='center')
+
+    # Adjust table position to leave space for the legend
+    ax.set_position([ax.get_position().x0, ax.get_position().y0 + 0.05, ax.get_position().width, ax.get_position().height - 0.1])
+
+    # Add the title above the table if provided
+    if title:
+        plt.figtext(0.5, 1, title, ha="center", fontsize=text_size, weight='bold')
+        
+    # Add legend text below the table if provided, aligned to the left of the table
+    if legend:
+        plt.figtext(legend_x, 0.05-legend_y*(df.shape[0]/5), legend, ha="left", fontsize=text_size * legend_font_size_factor)
+
+    return fig
 
 def plot_race_bars_and_points(
         df: pd.DataFrame, host_name: str, min_races: int = 10, min_n_host: int = 5, highlighted_lst: Optional[List[str]] = None,
