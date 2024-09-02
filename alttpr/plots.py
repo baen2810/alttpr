@@ -10,18 +10,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Optional, List, Tuple
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from utils import min2tstr
+from utils import min2tstr, notna
 
-def format_df_table(df, int_cols=[], min2tstr_cols=[], pct_cols=[], round_cols=[], combine_cols=[], round_digits=2):
+def format_df_table(df, int_cols=[], min2tstr_cols=[], pct_cols=[], round_cols=[], combine_cols=[], round_digits=2, nan_str=''):
     df_out = df.copy()
     for c in int_cols:
-        df_out[c] = round(df_out[c], 0).astype(int)
+        df_out[c] = [str(int(round(x, 0))) if notna(x) else nan_str for x in df_out[c]] 
     for c in min2tstr_cols:
-        df_out[c] = [min2tstr(x) for x in df_out[c]]
+        df_out[c] = [min2tstr(x) if notna(x) else nan_str for x in df_out[c]]
     for c in round_cols:
-        df_out[c] = [round(x, round_digits) for x in df_out[c]]
+        df_out[c] = [str(round(x, round_digits)) if notna(x) else nan_str for x in df_out[c]]
     for c in pct_cols:
-        df_out[c] = [str(int(x*100)) + '%' for x in df_out[c]]
+        df_out[c] = [str(int(x*100)) + '%' if notna(x) else nan_str for x in df_out[c]]
     for c in combine_cols:
         colname, c1, c2 = c
         df_out[colname] = [str(x) + ' - ' + str(y) for x, y in zip(df_out[c1], df_out[c2])]

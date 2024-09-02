@@ -18,8 +18,24 @@ import json
 import types
 import pickle
 import zipfile
+import numpy as np
 import pandas as pd
 import re
+
+
+def notna(x):
+    is_na = False if isna(x) else True
+    return is_na
+
+
+def isna(x):
+    is_na = True if pd.isna(x) else False
+    try:
+        is_na = True if np.isnan(x) else False
+    except:
+        pass
+    return is_na
+
 
 def clear_console():
     # For Windows
@@ -175,6 +191,8 @@ def ts2str(ts):
 
 
 def min2tstr(x):
+    if isna(x):
+        return ''
     h = int(x / 60)
     m = int(x) - h * 60
     s = int((x - int(x)) * 60)
