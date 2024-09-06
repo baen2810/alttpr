@@ -400,10 +400,14 @@ class DunkaScanner:
         window_title += " (e: confirm, x: edit, q: quit, w: forward 30s, s: back 30s, d: forward 1s, a: back 1s, f: jump to 01:30:00, y: back 1 min, c: forward 1 min, r: back 1 frame, t: forward 1 frame)"
 
         while True:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
-            ret, frame = cap.read()
-            if not ret:
-                break
+            ret = False
+            current_frame_tmp = current_frame
+            while not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame_tmp)
+                ret, frame = cap.read()
+                current_frame_tmp -= 30
+                if current_frame_tmp <= 60:
+                    raise ValueError('Could not find displayable frame.')
 
             # Calculate the current timestamp
             current_time = pd.to_timedelta(current_frame / fps, unit='s')
