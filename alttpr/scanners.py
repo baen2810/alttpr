@@ -199,8 +199,14 @@ class DunkaScanner:
         while True:
             cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
             ret, frame = cap.read()
-            if not ret:
-                break
+            while not ret:
+                pprint('Error displaying frame. Resetting by 00:0:01.')
+                current_frame = current_frame-fps
+                cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+                ret, frame = cap.read()
+                if current_frame <= fps+1:
+                    pprint('Still can not display frame')
+                    break
 
             # Calculate the current timestamp
             current_time = pd.to_timedelta(current_frame / fps, unit='s')
