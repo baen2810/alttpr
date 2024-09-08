@@ -12,6 +12,7 @@ from datetime import datetime as dt
 from time import sleep
 from os import remove
 from shutil import rmtree, copytree, copy2 as copy
+from typing import Optional, List, Union
 
 import os
 import json
@@ -21,6 +22,64 @@ import zipfile
 import numpy as np
 import pandas as pd
 import re
+import importlib.util
+from pathlib import Path
+
+def read_var_from_files(file_paths: Union[str, List[Path]], var_name: str) -> List[Optional[str]]:
+    """
+    Reads the 'var_name' variable from a list of Python files.
+    
+    :param file_paths: A list of Path objects pointing to Python files.
+    :return: A list of 'var_name' values from each file, or None if not found.
+    """
+    values_list = []
+    file_paths [file_paths] if isinstance(file_paths, str) else file_paths
+    
+    for file_path in file_paths:
+        # Load the Python file as a module
+        spec = importlib.util.spec_from_file_location(file_path.stem, file_path)
+        module = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(module)
+            
+            # Access the 'NOTES' variable, if it exists
+            values = getattr(module, var_name, None)
+            if values is not None:
+                values_list.append(values)
+            else:
+                values_list.append(None)
+        except Exception as e:
+            values_list.append(None)
+    
+    return values_list
+
+
+def date_from_str(text: str, date_formats: List[str] = ["%d.%m.%Y", "%d.%m.%y"]) -> Optional[dt]:
+    """
+    Extracts a date from a given string based on the provided list of date formats.
+    By default, it checks both 'DD.MM.YYYY' and 'DD.MM.YY' formats.
+    
+    :param text: The string containing the date.
+    :param date_formats: A list of expected date formats. Default is ["%d.%m.%Y", "%d.%m.%y"].
+    :return: A datetime object if a date is found and successfully parsed, else None.
+    """
+    # Define a regex pattern to match both "DD.MM.YYYY" and "DD.MM.YY"
+    date_pattern = r"\b\d{2}\.\d{2}\.\d{2,4}\b"
+    
+    # Search for a date in the string
+    match = re.search(date_pattern, text)
+    if match:
+        date_str = match.group(0)
+        # Try each date format in the list
+        for date_format in date_formats:
+            try:
+                # Try to parse the date using the current format
+                parsed_date = dt.strptime(date_str, date_format)
+                return parsed_date
+            except ValueError:
+                continue  # Try the next format if parsing fails
+    # Return None if no date was found or successfully parsed
+    return None
 
 
 def notna(x):

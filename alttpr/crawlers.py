@@ -1,4 +1,4 @@
-# RaceTimeCrawler - a racetime.gg crawler
+# ALTTPR crawlers
 # Copyright (c) 2023-2024 Benjamin Weiss
 #
 # Sources on GitHub:
@@ -46,7 +46,9 @@ from warnings import warn
 from typing import List, Union
 from pathlib import Path
 from tqdm import trange, tqdm
-from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str, to_tstr, to_dstr
+from alttpr.scanners import DunkaScanner
+from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str
+from alttpr.utils import notna, to_tstr, to_dstr, date_from_str, read_var_from_files
 
 # import base64
 # import io
@@ -68,6 +70,9 @@ if DEBUG:
     warnings.simplefilter(action='ignore', category=FutureWarning)
     pd.options.mode.chained_assignment = None
 class RacetimeCrawlerException(Exception):
+    """Base class for exceptions."""
+
+class VodCrawlerException(Exception):
     """Base class for exceptions."""
 
 class ParseError(RacetimeCrawlerException):
@@ -98,6 +103,290 @@ class LoadError(RacetimeCrawlerException):
     """Loading the crawler failed."""
 class UnsupportedFormatError(RacetimeCrawlerException):
     """File format is not supported."""
+
+
+class VodCrawler:
+    def __init__(self,
+                 gg_path: Union[Path, str],
+                 vod_path: Union[Path, str],
+                 video_ext: Union[str, List[str]] = ".mp4",
+                 scanner_ext: Union[str, List[str]] = ".pkl",
+                 config_notes_fn: str = 'config_notes.py',
+                 config_offset_fn: str = 'config_offset.py',
+                 config_timestamps_fn: str = 'config_timestamps.py',
+                 config_trackerpoints_fn: str = 'config_trackerpoints.py',
+                 ) -> None:
+        self.gg_path = Path(gg_path)
+        self.vod_path = Path(vod_path)
+        self.video_ext = [video_ext] if isinstance(video_ext, str) else video_ext
+        self.scanner_ext = [scanner_ext] if isinstance(scanner_ext, str) else scanner_ext
+        self.config_notes_fn=config_notes_fn
+        self.config_offset_fn=config_offset_fn
+        self.config_timestamps_fn=config_timestamps_fn
+        self.config_trackerpoints_fn=config_trackerpoints_fn
+        
+        self.vod_metadata_df = None
+
+        self.weekday_dict_DE = {'Monday': 'Montag', 'Tuesday': 'Dienstag', 'Wednesday': 'Mittwoch', 'Thursday': 'Donnerstag', 'Friday': 'Freitag', 'Saturday': 'Samstag', 'Sunday': 'Sonntag'}
+        self.weekday_dict_EN = {'0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday'}
+        self.lang = 'DE'
+        self.last_updated: pd.Timestamp = pd.Timestamp.now()
+
+        self.crawler = None
+        self.scanner_files = []
+
+    def init_gg(self) -> None:
+        """Loads the RacetimeCrawler instance."""
+        self.gg = RacetimeCrawler.load(self.gg_path)
+        pprint(f'--- Crawler host names: {list(self.gg.hosts_df.host_name)}')
+        pprint(f'--- Crawler last updated at: {self.gg.last_updated}')
+        pprint(f'--- Crawler # races: {len(self.gg.race_ids)}')
+
+    def init_vod(self) -> pd.DataFrame:
+        """Lists all files matching any file extension specified in vod_fileext_in and vod_fileext_out, and joins them into a dataframe using each file's parent directory as key."""
+        
+        # Recursively list all files matching input extensions
+        input_files = []
+        for ext in self.video_ext:
+            dot_str = '' if ext[0] == '.' else '.'
+            input_files.extend(self.vod_path.rglob(f"*{dot_str}{ext}"))
+
+        # Recursively list all files matching output extensions
+        output_files = []
+        for ext in self.scanner_ext:
+            dot_str = '' if ext[0] == '.' else '.'
+            output_files.extend(self.vod_path.rglob(f"*{dot_str}{ext}"))
+
+        # Create dataframes for both input and output files
+        input_df = pd.DataFrame({
+            'vod_name': [f.stem for f in input_files],
+            'video_ext': [f.suffix for f in input_files],
+            'video_fp': [f for f in input_files],
+            'host_name': [f.parts[-3] for f in input_files],
+        }).set_index('vod_name')
+
+        notes_lst = read_var_from_files([Path(f.parent, self.config_notes_fn) for f in output_files], var_name='NOTES')
+        timestamps_lst = read_var_from_files([
+            Path(f.parent, self.config_timestamps_fn) for f in output_files],
+            var_name='START_END_TIMESTAMP')
+        offset_lst = read_var_from_files([
+            Path(f.parent, self.config_offset_fn) for f in output_files],
+            var_name='OFFSET_TIMEDELTA')
+        itemtracker_box_lst = read_var_from_files([
+            Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
+            var_name='ITEMTRACKER_BOX')
+        itemtracker_points_lst = read_var_from_files([
+            Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
+            var_name='ITEMTRACKER_POINTS')
+        lightworld_map_box_lst = read_var_from_files([
+            Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
+            var_name='LIGHTWORLD_MAP_BOX')
+        darkworld_map_box_lst = read_var_from_files([
+            Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
+            var_name='DARKWORLD_MAP_BOX')
+        notes_lst = read_var_from_files([Path(f.parent, self.config_notes_fn) for f in output_files], var_name='NOTES')
+        output_df = pd.DataFrame({
+            'vod_name': [f.stem for f in output_files],
+            'scanner_ext': [f.suffix for f in output_files],
+            'scanner_fp': [f for f in output_files],
+            'start_ts': [pd.Timedelta(x['START_TS']) if x['START_TS'][2] == ':' else np.nan for x in timestamps_lst],
+            'end_ts': [pd.Timedelta(x['END_TS']) if x['END_TS'][2] == ':' else np.nan for x in timestamps_lst],
+            'offset_ts': [pd.Timedelta(x) if x and x[2] == ':' else np.nan for x in offset_lst],
+            'notes': notes_lst,
+            'itemtracker_box': itemtracker_box_lst,
+            'itemtracker_points': itemtracker_points_lst,
+            'lightworld_map_box': lightworld_map_box_lst,
+            'darkworld_map_box': darkworld_map_box_lst,
+        }).set_index('vod_name')
+
+        # Combine input and output dataframes
+        combined_df = pd.concat([input_df, output_df], axis=1).reset_index()
+        combined_df['vod_date'] = [date_from_str(s) for s in combined_df['vod_name']]
+
+        # set class attribute
+        self.vod_metadata_df = combined_df.sort_values('vod_date').reset_index(drop=True)[[
+            'vod_name', 'vod_date', 'scanner_fp', 
+            'start_ts', 'end_ts', 'offset_ts', 'notes',
+            'scanner_ext', 'host_name', 'video_fp', 'video_ext',
+            'itemtracker_box', 'itemtracker_points', 'lightworld_map_box', 'darkworld_map_box',
+        ]]
+
+        # eval metadata
+        self.eval_vod_metadata()
+    
+    def eval_vod_metadata(self):
+        no_date_lst = list(self.vod_metadata_df[self.vod_metadata_df.vod_date.isna()].vod_name)
+        pprint('Checking vod_date', end='...\t')
+        if len(no_date_lst):
+            print(f'videos without date ({len(no_date_lst)}/{self.vod_metadata_df.shape[0]}):\t{no_date_lst[0]} ... {no_date_lst[-1]}')
+        else:
+            print('ok')
+        no_scanner_lst = list(self.vod_metadata_df[self.vod_metadata_df.scanner_fp.isna()].vod_name)
+        pprint('Checking completion', end='...\t')
+        if len(no_scanner_lst):
+            print(f'unprocessed videos ({len(no_scanner_lst)}/{self.vod_metadata_df.shape[0]}):\t{no_scanner_lst[0]} ... {no_scanner_lst[-1]}')
+        else:
+            print('ok')
+        no_start_ts_lst = list(self.vod_metadata_df[self.vod_metadata_df.start_ts.isna()].vod_name)
+        pprint('Checking start_ts', end='...\t\t')
+        if len(no_start_ts_lst):
+            print(f'unprocessed videos ({len(no_start_ts_lst)}/{self.vod_metadata_df.shape[0]}):\t{no_start_ts_lst[0]} ... {no_start_ts_lst[-1]}')
+        else:
+            print('ok')
+        no_end_ts_lst = list(self.vod_metadata_df[self.vod_metadata_df.end_ts.isna()].vod_name)
+        pprint('Checking end_ts', end='...\t\t')
+        if len(no_end_ts_lst):
+            print(f'unprocessed videos ({len(no_end_ts_lst)}/{self.vod_metadata_df.shape[0]}):\t{no_end_ts_lst[0]} ... {no_end_ts_lst[-1]}')
+        else:
+            print('ok')
+        no_offset_ts_lst = list(self.vod_metadata_df[self.vod_metadata_df.offset_ts.isna()].vod_name)
+        pprint('Checking offset_ts', end='...\t')
+        if len(no_offset_ts_lst):
+            print(f'unprocessed videos ({len(no_offset_ts_lst)}/{self.vod_metadata_df.shape[0]}):\t{no_offset_ts_lst[0]} ... {no_offset_ts_lst[-1]}')
+        else:
+            print('ok')
+
+    def crawl(self, max_races: int = None) -> None:
+        cols = ['frame', 'tracker_name', 'point_id', 'point_tag', 'point_name', 'label']
+        scanner_lst = list(self.vod_metadata_df.dropna(subset='scanner_fp').scanner_fp)
+        scanner_lst = scanner_lst[:max_races] if max_races else scanner_lst
+        self.raw_df = pd.DataFrame()
+        pprint('Crawling scanners')
+        for i, fp in enumerate(scanner_lst):
+            df_tmp  =self.get_raw_data_from_scanner(fp, cols)
+            self.raw_df = pd.concat([self.raw_df, df_tmp])
+            pprint(f'Successfully extracted data ({i}/{len(scanner_lst)})')
+        pprint('Crawl completed.')
+
+    def get_raw_data_from_scanner(self, fp: Path, cols, scanner: Union[DunkaScanner] = DunkaScanner) -> None:
+        df = scanner.load(fp).color_coord_df
+        df = df[df.label != 'NONE']
+        df['vod_name'] = fp.stem
+        df['tracker_name'] = df['tracker_name'].str.strip()
+        df['point_name'] = df['point_name'].str.strip()
+        df['label'] = df['label'].str.strip()
+        df['point_id'] = df.point_name.str.split('|', expand=True)[0]
+        df['point_tag'] = df.point_name.str.split('|', expand=True)[1]
+        df = df.set_index('vod_name')
+        return df[cols]
+    
+    def initialize_from_crawler(self, vc: 'VodCrawler') -> None:
+        pass
+
+    def sanity_checks(self):
+        pass
+
+    def get_df(self, host_ids: Union[str, List[str]] = [], generic_filter: tuple = (None, None), drop_forfeits: bool = False, cols: List[str] = [],
+               host_rows_only: bool = False, windowed: Union[int, tuple] = None, unique: bool = False,
+               game_filter: bool = True, entrant_has_medal: bool = None, ) -> pd.DataFrame:
+        # TODO integrate host_name filter
+        try:
+            pass
+            # filter_col, filter_val = generic_filter
+            # host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
+            # host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
+            # cols = self.races_df_cols_cr + self.races_df_cols_tf if len(cols) == 0 else cols
+            # df = self.races_df[self.races_df.race_id.isin(self.races_df[self.races_df.entrant_id.isin(host_ids)].race_id)]
+            # df = df if filter_col is None else df[df[filter_col]==filter_val]
+            # df = df[[self.game_filter.lower() in r for r in df.race_id]] if game_filter else df
+            # df = df.dropna(subset=['entrant_finishtime']) if drop_forfeits else df
+            # df = df[df.entrant_id.isin(host_ids)] if host_rows_only else df
+            # df = df[~df.entrant_has_medal.isna()] if entrant_has_medal else df
+            # if type(windowed) == int:
+            #     if windowed == 0:  # get last race per host
+            #         df = df.set_index(['entrant_name', 'race_start']).join(
+            #             df[['entrant_name', 'race_start']].groupby('entrant_name').max().reset_index().set_index(
+            #                 ['entrant_name', 'race_start']), how='inner').reset_index()
+            #     else:
+            #         df = df[df.race_start >= dt.now() - pd.Timedelta(days=windowed)]
+            # elif type(windowed) == tuple:
+            #     min_race_date, max_race_date = windowed
+            #     df = df[df.race_start >= min_race_date]
+            #     df = df[df.race_start <= max_race_date]
+            # df = df[cols]
+            # df = df.drop_duplicates() if unique else df
+        except Exception as e:
+            raise VodCrawlerException(f'unable to retrieve data') from e
+        return df
+    
+    def refresh_transforms(self) -> None:
+        pass
+
+    def get_metrics(self):
+        try:
+            pass
+        except:
+            raise VodCrawlerException(f'unable to retrieve metrics') from e
+
+    def get_stats(self):
+        try:
+            pass
+        except Exception as e:
+            raise VodCrawlerException(f'unable to retrieve stats') from e
+                
+    def add_races(self):
+        '''Add one or more races and pull data'''
+        pass
+    
+    def set_output_path(self, path: Union[Path, str]) -> None:
+        path = Path(path)
+        if len(path.suffix) > 0:
+            raise RacetimeCrawlerException('self.output_path can\'t have file extension.')
+        self.output_path = path
+
+    def export(self, path: Union[Path, str] = None, dfs: List[str] = ['hosts_df', 'races_df', 'metrics_df', 'stats_df', 'race_mode_map_df', 'race_mode_simple_map_df', 'race_tournament_map_df'], host_names: Union[str, List[str]] = [], dropna=False) -> None:
+        try:
+           pass
+        except Exception as e:
+            raise VodCrawlerException(f'unable to export') from e
+    
+    def save(self, file_name: str = 'vod_crawler.pkl') -> None:
+        save_path = Path(self.output_path, file_name)
+        try:
+            if not Path(save_path.parent).exists():
+                save_path.parent.mkdir(parents=True)
+            with open(save_path, 'wb') as f:
+                pickle.dump(self, f)
+            pprint(f'Crawler object saved to: {save_path}')
+        except Exception as e:
+            raise SaveError(f'unable to save crawler: {save_path=}') from e
+    
+    @staticmethod
+    def load(path: Union[Path, str]) -> 'VodCrawler':
+        try:
+            pprint(f'Loading Crawler from: {path}', end='...')
+            try:
+                with open(path, 'rb') as f:
+                    crawler = pickle.load(f)
+            except:
+                print('not found.')
+            print('done.')
+            # pprint(f'Number of VODs in vod_df ({len(crawler._list_ids_in_races_df())}) does not match number of ids in self.race_ids ({len(crawler.race_ids)})') if len(crawler._list_ids_in_races_df()) != len(crawler.race_ids) else None
+            # pprint(f'Number of columns in races_df ({len(crawler.races_df.columns)}) does not match number of cols in crawler.races_df_cols_cr + _tf ({len(crawler.races_df_cols_cr) + len(crawler.races_df_cols_tf)})') if len(crawler.races_df_cols_cr) + len(crawler.races_df_cols_tf) != len(crawler.races_df.columns) else None
+            return crawler
+        except Exception as e:
+            raise LoadError(f'unable to load crawler: {path=}') from e
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class RacetimeCrawler:
