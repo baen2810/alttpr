@@ -25,6 +25,9 @@ import re
 import importlib.util
 from pathlib import Path
 
+def chop_ms(td):
+    return pd.Timedelta(str(td).split('.')[0])
+
 def read_var_from_files(file_paths: Union[str, List[Path]], var_name: str) -> List[Optional[str]]:
     """
     Reads the 'var_name' variable from a list of Python files.

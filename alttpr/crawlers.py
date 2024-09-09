@@ -47,7 +47,7 @@ from typing import List, Union
 from pathlib import Path
 from tqdm import trange, tqdm
 from alttpr.scanners import DunkaScanner
-from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str
+from alttpr.utils import pprint, pdidx, pprintdesc, get_list, clean_race_info_str, chop_ms
 from alttpr.utils import notna, to_tstr, to_dstr, date_from_str, read_var_from_files
 
 # import base64
@@ -109,30 +109,44 @@ class VodCrawler:
     def __init__(self,
                  gg_path: Union[Path, str],
                  vod_path: Union[Path, str],
+                 point_reference: list, 
                  video_ext: Union[str, List[str]] = ".mp4",
                  scanner_ext: Union[str, List[str]] = ".pkl",
                  config_notes_fn: str = 'config_notes.py',
+                 config_filter_td_fn: str = 'config_filter_td.py',
                  config_offset_fn: str = 'config_offset.py',
                  config_timestamps_fn: str = 'config_timestamps.py',
                  config_trackerpoints_fn: str = 'config_trackerpoints.py',
+                 points_metadata_path: Union[Path, str] = None,
+                 final_frame_point_names = ["70|EPP", "71|DPP", "72|THP", "73|PODP", "74|SPP", "75|SWP", "76|TTP", "77|IPP", "78|MMP",  "79|TRP"],
                  ) -> None:
         self.gg_path = Path(gg_path)
         self.vod_path = Path(vod_path)
+        self.point_reference = point_reference
         self.video_ext = [video_ext] if isinstance(video_ext, str) else video_ext
         self.scanner_ext = [scanner_ext] if isinstance(scanner_ext, str) else scanner_ext
         self.config_notes_fn=config_notes_fn
+        self.config_filter_td_fn=config_filter_td_fn
         self.config_offset_fn=config_offset_fn
         self.config_timestamps_fn=config_timestamps_fn
         self.config_trackerpoints_fn=config_trackerpoints_fn
+        self.stutter_sec = 10
+        self.get_points_metadata(points_metadata_path)
+        self.final_frame_point_names = final_frame_point_names
         
         self.vod_metadata_df = None
+        self.vod_names = pd.DataFrame(columns=['label', 'start_ts', 'end_ts', 'offset_ts'])
+        # self.times = pd.DataFrame(columns=['label'])
+        # self.tracker_names = pd.DataFrame(columns=['label'])
+        self.tracker_points = pd.DataFrame(columns=['label', 'tracker_name'])
+        self.tracker_labels = pd.DataFrame(columns=['label'])
 
         self.weekday_dict_DE = {'Monday': 'Montag', 'Tuesday': 'Dienstag', 'Wednesday': 'Mittwoch', 'Thursday': 'Donnerstag', 'Friday': 'Freitag', 'Saturday': 'Samstag', 'Sunday': 'Sonntag'}
         self.weekday_dict_EN = {'0': 'Monday', '1': 'Tuesday', '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday', '6': 'Sunday'}
         self.lang = 'DE'
         self.last_updated: pd.Timestamp = pd.Timestamp.now()
 
-        self.crawler = None
+        self.gg = None
         self.scanner_files = []
 
     def init_gg(self) -> None:
@@ -142,9 +156,14 @@ class VodCrawler:
         pprint(f'--- Crawler last updated at: {self.gg.last_updated}')
         pprint(f'--- Crawler # races: {len(self.gg.race_ids)}')
 
-    def init_vod(self) -> pd.DataFrame:
+    def get_points_metadata(self, points_metadata_path: Union[Path, str] = None) -> None:
+        points_metadata_path = points_metadata_path if points_metadata_path else Path(os.getcwd(), 'input/scanner_points_metadata.xlsx')
+        self.points_metadata_df = pd.read_excel(points_metadata_path)
+    
+    def init_vod(self, whitelist: list = None, blacklist: list = None) -> pd.DataFrame:
         """Lists all files matching any file extension specified in vod_fileext_in and vod_fileext_out, and joins them into a dataframe using each file's parent directory as key."""
-        
+        whitelist = [x.replace('.pkl', '') for x in whitelist] if whitelist else whitelist
+        blacklist = [x.replace('.pkl', '') for x in blacklist] if blacklist else blacklist
         # Recursively list all files matching input extensions
         input_files = []
         for ext in self.video_ext:
@@ -181,10 +200,17 @@ class VodCrawler:
         lightworld_map_box_lst = read_var_from_files([
             Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
             var_name='LIGHTWORLD_MAP_BOX')
+        lightworld_map_points_lst = read_var_from_files([
+            Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
+            var_name='LIGHTWORLD_MAP_POINTS')
         darkworld_map_box_lst = read_var_from_files([
             Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
             var_name='DARKWORLD_MAP_BOX')
+        darkworld_map_points_lst = read_var_from_files([
+            Path(f.parent, self.config_trackerpoints_fn) for f in output_files],
+            var_name='DARKWORLD_MAP_POINTS')
         notes_lst = read_var_from_files([Path(f.parent, self.config_notes_fn) for f in output_files], var_name='NOTES')
+        filter_td_lst = read_var_from_files([Path(f.parent, self.config_filter_td_fn) for f in output_files], var_name='FILTER_TD_LST')
         output_df = pd.DataFrame({
             'vod_name': [f.stem for f in output_files],
             'scanner_ext': [f.suffix for f in output_files],
@@ -193,20 +219,26 @@ class VodCrawler:
             'end_ts': [pd.Timedelta(x['END_TS']) if x['END_TS'][2] == ':' else np.nan for x in timestamps_lst],
             'offset_ts': [pd.Timedelta(x) if x and x[2] == ':' else np.nan for x in offset_lst],
             'notes': notes_lst,
+            'filter_td_lst': filter_td_lst,
             'itemtracker_box': itemtracker_box_lst,
             'itemtracker_points': itemtracker_points_lst,
             'lightworld_map_box': lightworld_map_box_lst,
+            'lightworld_map_points': lightworld_map_points_lst,
             'darkworld_map_box': darkworld_map_box_lst,
+            'darkworld_map_points': darkworld_map_points_lst,
         }).set_index('vod_name')
 
         # Combine input and output dataframes
         combined_df = pd.concat([input_df, output_df], axis=1).reset_index()
-        combined_df['vod_date'] = [date_from_str(s) for s in combined_df['vod_name']]
+        combined_df['vod_date'] = [date_from_str(s) for s in combined_df.vod_name]
+        
+        combined_df = combined_df[combined_df.vod_name.isin(whitelist)] if whitelist else combined_df
+        combined_df = combined_df[~combined_df.vod_name.isin(blacklist)] if blacklist else combined_df
 
         # set class attribute
-        self.vod_metadata_df = combined_df.sort_values('vod_date').reset_index(drop=True)[[
+        self.vod_metadata_df = combined_df.sort_values('vod_date', ascending=False)[[
             'vod_name', 'vod_date', 'scanner_fp', 
-            'start_ts', 'end_ts', 'offset_ts', 'notes',
+            'start_ts', 'end_ts', 'offset_ts', 'notes', 'filter_td_lst',
             'scanner_ext', 'host_name', 'video_fp', 'video_ext',
             'itemtracker_box', 'itemtracker_points', 'lightworld_map_box', 'darkworld_map_box',
         ]]
@@ -247,66 +279,424 @@ class VodCrawler:
             print('ok')
 
     def crawl(self, max_races: int = None) -> None:
-        cols = ['frame', 'tracker_name', 'point_id', 'point_tag', 'point_name', 'label']
+        cols = ['vod_name', 'time', 'point_name', 'label', 'label_change', 'has_change']  # 'time_change', 
         scanner_lst = list(self.vod_metadata_df.dropna(subset='scanner_fp').scanner_fp)
         scanner_lst = scanner_lst[:max_races] if max_races else scanner_lst
         self.raw_df = pd.DataFrame()
         pprint('Crawling scanners')
         for i, fp in enumerate(scanner_lst):
-            df_tmp  =self.get_raw_data_from_scanner(fp, cols)
+            df_tmp = self.get_raw_data_from_scanner(fp, cols)
             self.raw_df = pd.concat([self.raw_df, df_tmp])
-            pprint(f'Successfully extracted data ({i}/{len(scanner_lst)})')
+            pprint(f'Successfully extracted data ({i+1}/{len(scanner_lst)})')
         pprint('Crawl completed.')
 
     def get_raw_data_from_scanner(self, fp: Path, cols, scanner: Union[DunkaScanner] = DunkaScanner) -> None:
-        df = scanner.load(fp).color_coord_df
-        df = df[df.label != 'NONE']
+        # if 'ALTTP Rando #22.01.2024' in str(fp):
+        #     print('now')
+        sc = scanner.load(fp)
+        df = sc.color_coord_df.copy()
+        try:
+            df['offset_ts'] = sc.offset_ts
+        except:
+            df['offset_ts'] = np.nan
+            pprint('Unable to extract offset_ts')
         df['vod_name'] = fp.stem
         df['tracker_name'] = df['tracker_name'].str.strip()
         df['point_name'] = df['point_name'].str.strip()
         df['label'] = df['label'].str.strip()
-        df['point_id'] = df.point_name.str.split('|', expand=True)[0]
-        df['point_tag'] = df.point_name.str.split('|', expand=True)[1]
-        df = df.set_index('vod_name')
+        df['point_name_label'] = df['point_name']
+        df['vod_name'] = self._add_vod_names(df[['vod_name', 'start_ts', 'end_ts', 'offset_ts']])
+        df['time'] = self._add_times(df.frame)
+        df['point_name'] = self._add_tracker_points(df[['point_name', 'tracker_name']])
+        df['label_name'] = df['label']
+        df['label'] = self._add_tracker_labels(df.label)
+        # apply custom filters - in vod time!
+        df_m = self.get_metadata().reset_index()
+        df_m = df_m[df_m.vod_name==fp.stem]
+        filter_td_lst = list(df_m[df_m.vod_name==fp.stem].filter_td_lst)[0]
+        if filter_td_lst:
+            for td_start, td_end in filter_td_lst:
+                mask = ((df.time < pd.Timedelta(td_start).total_seconds()) | (df.time > pd.Timedelta(td_end).total_seconds()))
+                df['mask'] = mask
+                df = df[mask]
+        # apply last_frame_filters
+        df = df.set_index(['point_name_label']).join(df[['point_name_label', 'time']].groupby('point_name_label').max().rename(columns={'time': 'time_max'}), rsuffix='_max').reset_index()
+        df['mask'] = [True if (l not in self.final_frame_point_names) or (l in self.final_frame_point_names and t==tm) else False for l,t,tm in zip(df.point_name_label, df.time, df.time_max)]
+        df = df[df['mask']]
+        # find change points
+        df_changes = df.sort_values(['point_name', 'frame'])
+        df_changes['time_change'] = df_changes.time.shift(-1)
+        df_changes.time = df_changes.time_change
+        df_changes['point_name_change'] = df_changes.point_name.shift(-1)
+        df_changes['label_change'] = df_changes.label.shift(-1)
+        df_changes['label_name_change'] = df_changes.label_name.shift(-1)
+        df_changes = df_changes[df_changes.point_name == df_changes.point_name_change]
+        df_changes = df_changes[df_changes.label != df_changes.label_change]
+        df_changes['label_change'] = df_changes['label_change'].astype('int')
+        df_changes['has_change'] = 1
+        df_changes = df_changes[df_changes.label_name.str.split('-', expand=True)[0] != df_changes.label_name_change.str.split('-', expand=True)[0]]
+        # add points that never change
+        point_names_missing = [p for p in self.point_reference if p not in list(set(df_changes.point_name_label))]
+        df_no_changes = df[df.point_name_label.isin(point_names_missing)]
+        df_valids = df_no_changes[['point_name', 'frame']].groupby(['point_name']).min().reset_index()
+        df_no_changes = df_no_changes.set_index(['point_name', 'frame']).join(df_valids.set_index(['point_name', 'frame']), how='inner').reset_index()
+        df_no_changes['point_name_change'] = np.nan
+        df_no_changes['label_change'] = df_no_changes['label']
+        df_no_changes['has_change'] = 0
+        
+        df_changes = df_changes[cols]
+        df_no_changes = df_no_changes[cols]
+        df = pd.concat([df_changes, df_no_changes], ignore_index=True).sort_values(['time', 'point_name'])
+
+        del sc
         return df[cols]
-    
+
+    def _add_vod_names(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_vod_names = df.drop_duplicates().reset_index(drop=True).rename(columns={'vod_name': 'label'})
+        if df_vod_names.shape[0] > 1:
+            raise VodCrawlerException(f'Ingest error - too many rows: {df_vod_names}')
+        df_tmp = self.vod_names[self.vod_names.label == df_vod_names.label[0]]
+        df_tmp = df_tmp[df_tmp.start_ts == df_vod_names.start_ts[0]]
+        df_tmp = df_tmp[df_tmp.end_ts == df_vod_names.end_ts[0]]
+        # df_tmp = self.vod_names[self.vod_names.offset_ts == df_vod_names.offset_ts[0]]
+        if df_tmp.shape[0] == 0:
+            self.vod_names = pd.concat([self.vod_names, df_vod_names], ignore_index=True)
+        else:
+            raise ValueError(f'found duplicate entries in df_tmp: {df_tmp}')
+        mapping = self._vod_names_dict(inverse=True)
+        return list(df.vod_name.replace(mapping))
+
+    def _add_times(self, col: pd.Series) -> list:
+        times_lst = [x.seconds for x in col]
+        return times_lst
+   
+    def _add_tracker_points(self, df: pd.DataFrame) -> list:
+        df.tracker_name = df.tracker_name.replace({'IT': '1|IT', 'LW': '2|LW', 'DW': '3|DW'})
+        df_tracker_points = df.drop_duplicates().sort_values(['tracker_name', 'point_name']).reset_index(drop=True).rename(columns={'point_name': 'label'})
+        for i, row in df_tracker_points.iterrows():
+            df_tmp = self.tracker_points[self.tracker_points.label == row.label]
+            df_tmp = df_tmp[df_tmp.tracker_name == row.tracker_name]
+            if df_tmp.shape[0] == 0:
+                self.tracker_points = pd.concat([self.tracker_points, df_tracker_points], ignore_index=True)
+        mapping = self._tracker_points_dict(inverse=True)
+        return list(df.point_name.replace(mapping))
+
+    def _add_tracker_labels(self, col: pd.Series) -> list:
+        labels_lst = list(sorted(set(col)))
+        for l in labels_lst:
+            if l not in self.tracker_labels.label:
+                self.tracker_labels = pd.concat([self.tracker_labels, pd.DataFrame([l], columns=['label'])], ignore_index=True)
+        mapping = self.tracker_labels.reset_index().set_index('label').to_dict()['index']
+        return list(col.replace(mapping))
+
+    def _vod_names_dict(self, inverse=False):
+        if inverse:
+            map_dict = self.vod_names.reset_index().set_index('label').to_dict()['index']
+        else:
+            map_dict = self.vod_names.to_dict()['label']
+        return map_dict
+
+    def _tracker_points_dict(self, inverse=False):
+        if inverse:
+            map_dict = self.tracker_points.reset_index().set_index('label').to_dict()['index']
+        else:
+            map_dict = self.tracker_points.to_dict()['label']
+        return map_dict
+
     def initialize_from_crawler(self, vc: 'VodCrawler') -> None:
         pass
 
-    def sanity_checks(self):
-        pass
+    def sanity_checks(self,
+        df_in: pd.DataFrame = None,
+        event_count_thres: int = 225,
+        remove_optional_items: bool = True,
+        vod_names: list = None,
+        point_names: list = None,
+        last_event_td_thres: str = '00:03:00',
+        events_per_item_thres: int = 1,
+        grey_to_x_timer_thres: str = '00:05:00',
+        revert_count_thres: int = 0,
+        # broken_chain_thres: int = 0,
+        ) -> pd.DataFrame:        
+        df = df_in if df_in else self.get_df()      
+        # df = df.set_index('point_name').join(self.points_metadata_df.set_index('point_name').drop(columns=['point_id', 'tracker_name'])).reset_index()
+        df = df[df.is_opt==0] if remove_optional_items else df
+        df = df[df.vod_name.isin(vod_names)] if vod_names else df
+        df = df[df.point_names.isin(point_names)] if point_names else df
+        df_points = df[['vod_id', 'vod_name', 'host_name', 'point_name']].drop_duplicates().set_index(['vod_id', 'vod_name', 'host_name', 'point_name'])
+        df = df.set_index('vod_id')
+        df['is_forfeit'] = [0 if notna(x) else 1 for x in df.entrant_finishtime]
+        # for debugging
+        # df_tst  = df[df.vod_date.isin(['2024-01-29'])][[  # '2024-07-29' '2024-08-01' '2024-07-28'
+        # 'vod_name', 'timer_ha', 
+        # 'point_name', 'point_label', 'point_label_update', 'is_stutter', 'has_change', 'tracker_id',
+        # 'time', 'timer', 'time_adj', 'timer_adj',
+        # ]].sort_values(['time', 'tracker_id', 'point_name',])
+        # df_tst.time = [str(t)[-8:] for t in df_tst.time]
+        # df_tst.time_adj = [str(t)[-8:] for t in df_tst.time_adj]
+        # df_tst.timer = [str(t)[-8:] for t in df_tst.timer]
+        # df_tst.timer_adj = [str(t)[-8:] for t in df_tst.timer_adj]
+        # df_tst.timer_ha = [str(t)[-8:] for t in df_tst.timer_ha]
+        # event_count
+        df_metrics = df.copy()
+        df_metrics = df_metrics[['vod_name', 'host_name', 'point_name', 'is_forfeit']].reset_index().groupby(['vod_id', 'vod_name', 'host_name', 'is_forfeit']).count().rename(columns={'point_name':'event_count'})
+        df_metrics[f'event_count>{event_count_thres}|w1'] = [1 if x > event_count_thres else 0 for x in df_metrics.event_count]
+        # crystal_count
+        df_crystals = df.copy()
+        df_crystals = df_crystals[['vod_name', 'host_name', 'point_name']][[True if 'CRYSTAL' in x else False for x in df.point_label_update]].reset_index().groupby(['vod_id', 'vod_name', 'host_name']).count().rename(columns={'point_name':'crystal_count'})
+        df_crystals['crystal_count<>7|w1'] = [1 if x != 7 else 0 for x in df_crystals.crystal_count]
+        # last_event_delta
+        df_last_event_ts = df.copy()
+        df_last_event_ts = df_last_event_ts[['vod_name', 'host_name', 'timer_ha', 'end_ts_ha']].reset_index().groupby(['vod_id', 'vod_name', 'host_name']).max().rename(columns={'timer_ha':'last_event_ts'})
+        df_last_event_ts['last_event_delta'] = df_last_event_ts.end_ts_ha - df_last_event_ts.last_event_ts
+        df_last_event_ts[f'last_event>{last_event_td_thres}|w1'] = [1 if x > pd.Timedelta(last_event_td_thres) else 0 for x in df_last_event_ts.last_event_delta]
+        df_last_event_ts['last_event<0|e1'] = [1 if x < pd.Timedelta('00:00:00') else 0 for x in df_last_event_ts.last_event_delta]
+        # point_count, missing_points
+        most_frequent_point_count = df[['vod_name', 'point_name']].drop_duplicates().groupby('vod_name').count().mode().point_name[0]
+        df_point_cnt = df.copy()
+        df_point_cnt = df_point_cnt[['vod_name', 'host_name', 'point_name']].reset_index().drop_duplicates().groupby(['vod_id', 'vod_name', 'host_name']).count().rename(columns={'point_name':'point_name_count'})
+        vod_name_lst, host_name_lst, missing_points_lst, new_points_lst = [], [], [], []
+        for i, row in df[['vod_name', 'host_name']].drop_duplicates().iterrows():
+            df_tmp = df[df.vod_name == row.vod_name]
+            df_tmp = df_tmp[df_tmp.host_name == row.host_name]
+            vod_name_lst += [row.vod_name]
+            host_name_lst += [row.host_name]
+            missing_points_lst += [', '.join([x for x in self.point_reference if x not in list(sorted(set(df_tmp.point_name)))])]
+            new_points_lst += [', '.join([x for x in list(sorted(set(df_tmp.point_name))) if x not in self.point_reference])]
+        df_point_cnt = df_point_cnt.join(pd.DataFrame({'vod_name': vod_name_lst, 'host_name': host_name_lst, 'points_missing': missing_points_lst, 'points_new': new_points_lst}).set_index(['vod_name', 'host_name']))
+        df_point_cnt[f'point_name_count<>{most_frequent_point_count}|w1'] = [1 if x != most_frequent_point_count else 0 for x in df_point_cnt.point_name_count]
+        # df_point_cnt['point_name_count>141|w2'] = [1 if x > 141 else 0 for x in df_point_cnt.point_name_count]
+        # revert_count, broken_chain_count
+        df_rev = df.copy()
+        df_rev = df_rev[['vod_name', 'host_name', 'point_name', 'point_label', 'point_label_update', 'has_lightblue']]
+        df_rev = df_rev[df_rev.point_label != 'CRYSTAL']
+        df_rev = df_rev[df_rev.point_label_update != 'CRYSTAL']
+        df_1chains = df_rev[['vod_name', 'host_name', 'point_name', 'point_label', 'has_lightblue']].groupby(['vod_name', 'host_name', 'point_name', 'has_lightblue']).count().rename(columns={'point_label': 'revert_count'})
+        df_1chains = df_rev.reset_index().set_index(['vod_id', 'vod_name', 'host_name', 'point_name', 'has_lightblue']).join(df_1chains[df_1chains.revert_count==1], how='inner').reset_index()
+        df_1chains = df_1chains.set_index(['vod_id', 'vod_name', 'host_name', 'point_name', 'has_lightblue'])[['revert_count']]
+        df_1chains.revert_count = 0
+        for c in df_rev.columns:
+            df_rev[c + '_1'] = df_rev[c].shift(-1)
+        df_rev = df_rev[df_rev.vod_name == df_rev.vod_name_1]
+        df_rev = df_rev[df_rev.host_name == df_rev.host_name_1]
+        df_rev = df_rev[df_rev.point_name == df_rev.point_name_1]
+        df_rev['revert_count'] = [1 if pl==plu1 and plu==pl1 else 0 for pl,pl1,plu,plu1 in zip(df_rev.point_label, df_rev.point_label_1, df_rev.point_label_update, df_rev.point_label_update_1)]
+        df_rev = df_rev[['vod_name', 'host_name', 'point_name', 'revert_count', 'has_lightblue']].groupby(['vod_id', 'vod_name', 'host_name', 'point_name', 'has_lightblue']).sum()
+        df_rev = pd.concat([df_rev, df_1chains])
+        df_rev = df_rev.reset_index().set_index(['vod_id', 'vod_name', 'host_name', 'point_name'])
+        df_rev_bmb = df_rev.reset_index()
+        df_rev_bmb = df_rev_bmb[df_rev_bmb.point_name=='17|BMB'][['vod_id', 'revert_count']]
+        df_rev = df_rev.join(df_rev_bmb.set_index('vod_id'), rsuffix='_bmb')
+        df_rev.revert_count = [max(0, r-rb) if lb else r for r, rb, lb in zip(df_rev.revert_count, df_rev.revert_count_bmb, df_rev.has_lightblue)]
+        df_rev[f'revert_count>{revert_count_thres}|w1'] = [1 if x > revert_count_thres else 0 for x in df_rev.revert_count]
+        df_rev = df_rev[[f'revert_count>{revert_count_thres}|w1']].reset_index().groupby(['vod_id', 'vod_name', 'host_name', 'point_name']).sum().reset_index()
+        df_rev_point_names = df_rev[df_rev[f'revert_count>{revert_count_thres}|w1']==1].reset_index()
+        df_rev_point_names.point_name += ', '
+        df_rev_point_names = df_rev_point_names.groupby(['vod_id', 'vod_name', 'host_name'])[['point_name']].sum().rename(columns={'point_name': 'revert_points'})
+        df_rev_point_names['revert_points'] = [str(x)[:-2] for x in df_rev_point_names.revert_points]
+        df_rev_join = df_rev.set_index(['vod_id', 'vod_name', 'host_name', 'point_name'])
+        df_rev.point_name = df_rev.point_name + ', '
+        df_rev = df_rev.groupby(['vod_id', 'vod_name', 'host_name']).sum().join(df_rev_point_names).drop(columns='point_name')
+        # chain, chain_len
+        df_chain = df.copy()
+        # df_chain = df_chain[df_chain.vod_name=='ALTTP Rando #29.01.2024']
+        df_chain['point_label'] = df_chain['point_label'] + '-'
+        df_chain['point_label_update'] = df_chain['point_label_update'] + '-'
+        df_chain['time'] = [str(x)[-8:] + '-' for x in df_chain.time]
+        df_chain = pdidx(df_chain[['vod_name', 'host_name', 'point_name', 'point_label', 'point_label_update', 'time', 'has_lightblue']].reset_index().groupby(['vod_id', 'vod_name', 'host_name', 'point_name', 'has_lightblue']).agg({
+            'point_label': ['first'],
+            'point_label_update': ['sum', 'count', 'last'],
+            'time': ['sum'],
+            })).rename(columns={'point_label|first': 'chain_start', 'point_label_update|last': 'chain_end', 'point_label_update|sum': 'chain', 'point_label_update|count': 'chain_len', 'time|sum': 'chain_time'}).reset_index()
+        df_chain['chain_len'] += 1
+        df_chain['chain'] = df_chain['chain_start'] + df_chain['chain']
+        df_chain['chain_start'] = [x[:-1] for x in df_chain['chain_start']]
+        df_chain['chain'] = [x[:-1] for x in df_chain['chain']]
+        df_chain['chain_end'] = [x[:-1] for x in df_chain['chain_end']]
+        df_chain['chain_time'] = [x[:-1] for x in df_chain['chain_time']]
+        df_chain_bmb = df_chain[df_chain.point_name=='17|BMB'][['vod_id', 'chain_len']]
+        df_chain = df_chain.set_index('vod_id').join(df_chain_bmb.set_index('vod_id'), rsuffix='_bmb').reset_index()
+        df_chain['chain_len_no_bmb'] = [max(0, r-rb+1) if lb else r for r, rb, lb in zip(df_chain.chain_len, df_chain.chain_len_bmb, df_chain.has_lightblue)]
+        df_chain_join = df_chain.set_index(['vod_id', 'vod_name', 'host_name', 'point_name'])
+        df_chain = df_chain[['vod_id', 'vod_name', 'host_name']].groupby(['vod_id', 'vod_name', 'host_name']).sum()
+        # events_per_item
+        df_epi = df.copy().reset_index()
+        df_epi = df_epi[['vod_id', 'vod_name', 'host_name', 'point_name', 'point_label', 'events_per_item_max', 'has_lightblue']].groupby(['vod_id', 'vod_name', 'host_name', 'point_name', 'events_per_item_max', 'has_lightblue']).count().rename(columns={'point_label':'events_per_item'})
+        df_epi = df_epi.reset_index()
+        df_epi['events_per_item_delta'] = [max(0, x-y) for x,y in zip(df_epi.events_per_item, df_epi.events_per_item_max)]
+        df_epi_bmb = df_epi[df_epi.point_name=='17|BMB'][['vod_id', 'events_per_item_delta']]
+        df_epi = df_epi.set_index('vod_id').join(df_epi_bmb.set_index('vod_id'), rsuffix='_bmb').reset_index()
+        df_epi['events_per_item_delta'] = [max(0, r-rb) if lb else r for r, rb, lb in zip(df_epi.events_per_item_delta, df_epi.events_per_item_delta_bmb, df_epi.has_lightblue)]
+        df_epi[f'epi_delta>{events_per_item_thres}|w1'] = [1 if x > events_per_item_thres else 0 for x in df_epi.events_per_item_delta]
+        df_epi['epi_delta>5|e1'] = [1 if x > 5 else 0 for x in df_epi.events_per_item_delta]
+        df_epi = df_epi[['vod_id', 'vod_name', 'host_name', 'point_name', f'epi_delta>{events_per_item_thres}|w1', 'epi_delta>5|e1', 'events_per_item', 'events_per_item_delta', 'events_per_item_max']].groupby(['vod_id', 'vod_name', 'host_name', 'point_name', 'events_per_item_delta', 'events_per_item', 'events_per_item_max']).sum()
+        df_epi_join = df_epi.reset_index().set_index(['vod_id', 'vod_name', 'host_name', 'point_name'])
+        df_epi = df_epi.reset_index()[['vod_id', 'vod_name', 'host_name', 'events_per_item', f'epi_delta>{events_per_item_thres}|w1', 'epi_delta>5|e1']].groupby(['vod_id', 'vod_name', 'host_name']).agg({
+            'events_per_item': ['max'], 
+            f'epi_delta>{events_per_item_thres}|w1': ['sum'], 
+            'epi_delta>5|e1': ['sum'], 
+        }).droplevel(1,axis=1).rename(columns={'events_per_item': 'epi_max'})
+        # grey_to_x_count
+        df_g2x = df.copy().reset_index()
+        df_g2x = df_g2x[df_g2x.point_label == 'GREY']
+        df_g2x = df_g2x[df_g2x.point_label_update != 'GREY']
+        df_g2x[f'grey_to_x_count<={grey_to_x_timer_thres}|w1'] = [1 if x <= pd.Timedelta(grey_to_x_timer_thres) else 0 for x in df_g2x.timer]
+        df_g2x[f'grey_to_x_count>{grey_to_x_timer_thres}|e1'] = [1 if x > pd.Timedelta(grey_to_x_timer_thres) else 0 for x in df_g2x.timer]
+        df_g2x = df_g2x[['vod_id', 'vod_name', 'host_name', 'point_name', f'grey_to_x_count<={grey_to_x_timer_thres}|w1', f'grey_to_x_count>{grey_to_x_timer_thres}|e1']].groupby(['vod_id', 'vod_name', 'host_name', 'point_name']).sum()
+        df_g2x_join = df_g2x.copy()
+        df_g2x = df_g2x.reset_index()[['vod_id', 'vod_name', 'host_name', f'grey_to_x_count<={grey_to_x_timer_thres}|w1', f'grey_to_x_count>{grey_to_x_timer_thres}|e1']].groupby(['vod_id', 'vod_name', 'host_name']).sum()
+        # build output dfs
+        df_metrics = df_metrics.join(df_crystals).join(df_point_cnt).join(df_rev).join(df_chain).join(df_epi).join(df_g2x).join(df_last_event_ts)
+        df_metrics['n_issues'] = list(df_metrics[[c for c in df_metrics.columns if '|w' in c or '|e' in c]].sum(axis=1))
+        df_metrics['n_warnings'] = list(df_metrics[[c for c in df_metrics.columns if '|w' in c]].sum(axis=1))
+        df_metrics['n_errors'] = list(df_metrics[[c for c in df_metrics.columns if '|e' in c]].sum(axis=1))
+        df_metrics = df_metrics.fillna(0)
+        df_metrics = df_metrics.sort_values(['n_issues', 'event_count'], ascending=False).reset_index()
+        # select output columns
+        df_metrics = df_metrics[[
+            'vod_id', 'vod_name', 'host_name', 'is_forfeit', 'n_issues', 'event_count', 'epi_max',
+            'crystal_count<>7|w1', f'point_name_count<>{most_frequent_point_count}|w1', f'revert_count>{revert_count_thres}|w1',
+            # f'broken_chain_count>{broken_chain_thres}|w1',
+            f'epi_delta>{events_per_item_thres}|w1', 'epi_delta>5|e1',
+            'last_event<0|e1', f'grey_to_x_count<={grey_to_x_timer_thres}|w1', f'grey_to_x_count>{grey_to_x_timer_thres}|e1',
+            f'last_event>{last_event_td_thres}|w1', f'event_count>{event_count_thres}|w1', 'revert_points',
+            'n_warnings', 'n_errors', 'crystal_count', 'point_name_count', 'points_missing',
+            'points_new', 'last_event_ts', 'end_ts_ha', 'last_event_delta', 
+            ]]
+        # join metrics
+        df_metrics_points = df_points.join(df_rev_join).join(df_chain_join).join(df_epi_join).join(df_g2x_join).reset_index()
+        df_metrics_points = df_metrics_points.fillna(0)
+        df_metrics_points['n_issues'] = list(df_metrics_points[[c for c in df_metrics_points.columns if '|w' in c or '|e' in c]].sum(axis=1))
+        df_metrics_points['n_warnings'] = list(df_metrics_points[[c for c in df_metrics_points.columns if '|w' in c]].sum(axis=1))
+        df_metrics_points['n_errors'] = list(df_metrics_points[[c for c in df_metrics_points.columns if '|e' in c]].sum(axis=1))
+        # df_metrics_points_tmp  = df_metrics_points[df_metrics_points.vod_name.isin(['ALTTP Rando #26.02.2023', 'ALTTP Rando #01.08.2024'])]
+        # TODO Check co-occurrence of itemtracker- and map-boss-completions
+        # TODO color validity checks
+        pprint('Completed sanity checks')
+        return (df, df_metrics, df_metrics_points)
 
-    def get_df(self, host_ids: Union[str, List[str]] = [], generic_filter: tuple = (None, None), drop_forfeits: bool = False, cols: List[str] = [],
-               host_rows_only: bool = False, windowed: Union[int, tuple] = None, unique: bool = False,
-               game_filter: bool = True, entrant_has_medal: bool = None, ) -> pd.DataFrame:
-        # TODO integrate host_name filter
+    def get_df(self, tracker_tag_filter: list = ['IT', 'LW', 'DW'], as_time='td', remove_stutter=[], last_state_only=False, cols: list = None, adjust_time=False, gg_cols: list = ['race_start', 'entrant_name', 'entrant_place', 'entrant_finishtime', 'entrant_rank', 'race_mode_simple', 'race_group', 'race_tournament', 'race_category', ]) -> pd.DataFrame:
+        # TODO add filter for crystal tags and boss tags
+        # TODO make sure all int ids (point_id, tracker_id!) are integer
         try:
-            pass
-            # filter_col, filter_val = generic_filter
-            # host_ids = [host_ids] if isinstance(host_ids, str) else host_ids
-            # host_ids = list(self.hosts_df.host_id) if len(host_ids) == 0 else host_ids
-            # cols = self.races_df_cols_cr + self.races_df_cols_tf if len(cols) == 0 else cols
-            # df = self.races_df[self.races_df.race_id.isin(self.races_df[self.races_df.entrant_id.isin(host_ids)].race_id)]
-            # df = df if filter_col is None else df[df[filter_col]==filter_val]
-            # df = df[[self.game_filter.lower() in r for r in df.race_id]] if game_filter else df
-            # df = df.dropna(subset=['entrant_finishtime']) if drop_forfeits else df
-            # df = df[df.entrant_id.isin(host_ids)] if host_rows_only else df
-            # df = df[~df.entrant_has_medal.isna()] if entrant_has_medal else df
-            # if type(windowed) == int:
-            #     if windowed == 0:  # get last race per host
-            #         df = df.set_index(['entrant_name', 'race_start']).join(
-            #             df[['entrant_name', 'race_start']].groupby('entrant_name').max().reset_index().set_index(
-            #                 ['entrant_name', 'race_start']), how='inner').reset_index()
-            #     else:
-            #         df = df[df.race_start >= dt.now() - pd.Timedelta(days=windowed)]
-            # elif type(windowed) == tuple:
-            #     min_race_date, max_race_date = windowed
-            #     df = df[df.race_start >= min_race_date]
-            #     df = df[df.race_start <= max_race_date]
-            # df = df[cols]
-            # df = df.drop_duplicates() if unique else df
+            # collect data
+            df = self.get_rawdata()
+            df = df.set_index('point_name').join(self.points_metadata_df.set_index('point_name').drop(columns=['point_id', 'tracker_name'])).reset_index()
+            df = df.set_index('vod_name')
+            df = df[[False if s and t in remove_stutter else True for s,t in zip(df.is_stutter, df.point_name)]] if remove_stutter else df
+            df = df[df.tracker_tag.isin(tracker_tag_filter)]
+            df = df.join(self.get_metadata(), rsuffix='_md').reset_index()
+            host_ids_lst = self.gg.hosts_df[self.gg.hosts_df.host_name.isin(list(set(df.host_name)))].host_id.to_list()
+            df_gg = self.gg.get_df(host_ids=host_ids_lst, cols=gg_cols, unique=True, host_rows_only=True).rename(columns={'entrant_name': 'host_name', 'race_start': 'vod_date'})
+            df_gg.vod_date = pd.to_datetime(df_gg.vod_date.dt.date)
+            df = df.set_index(['vod_date', 'host_name']).join(df_gg.set_index(['vod_date', 'host_name']), how='left').reset_index()
+            if last_state_only:
+                df_filter = df[['vod_id', 'time', 'point_name']].groupby(['vod_id', 'point_name']).max()
+                df = df.set_index(['vod_id', 'point_name']).join(df_filter, rsuffix='_max')
+                df = df[df.time == df.time_max]
+            # timestamps
+            df['start_ts_ha'] = [chop_ms(t) if notna(t) else chop_ms(tmd) for t, tmd in zip(df.start_ts, df.start_ts_md)]
+            df['end_ts_ha'] = [chop_ms(t) if notna(t) else chop_ms(tmd) for t, tmd in zip(df.end_ts, df.end_ts_md)]
+            df['duration_ha'] = df['end_ts_ha'] - df['start_ts_ha']
+            df['duration_delta'] = df.entrant_finishtime - df.duration_ha                
+            df['offset_ts_ha'] = [chop_ms(o) if notna(o) else chop_ms(omd) for o, omd in zip(df.offset_ts, df.offset_ts_md)]
+            df['offset_ts_ha'] = df['offset_ts_ha'].fillna(pd.Timedelta('00:00:00'))
+            df['timer'] = [t + o.seconds - s.seconds for t,o,s in zip(df.time, df.offset_ts_ha, df.start_ts_ha)] # TODO subtract start_ts
+            df['time_adj'] = round(df.time + (df.time / df.end_ts_ha.dt.seconds) * df.duration_delta.dt.seconds, 0)
+            df['timer_adj'] = round(df.timer + (df.timer / (df.end_ts_ha.dt.seconds + df.offset_ts_ha.dt.seconds)) * df.duration_delta.dt.seconds, 0)
+            df['time_ha'] = [ta if notna(ta) else t for t,ta in zip(df.time, df.time_adj)]
+            df['timer_ha'] = [ta if notna(ta) else t for t,ta in zip(df.timer, df.timer_adj)]
+            if as_time in ['td', 'dt']:
+                df.time = [pd.Timedelta(seconds=x) for x in df.time]
+                df.timer = [pd.Timedelta(seconds=x) for x in df.timer]
+                df.time_adj = [pd.Timedelta(seconds=x) if notna(x) else np.nan for x in df.time_adj]
+                df.timer_adj = [pd.Timedelta(seconds=x) if notna(x) else np.nan for x in df.timer_adj]
+                df.time_ha = [pd.Timedelta(seconds=x) if notna(x) else np.nan for x in df.time_ha]
+                df.timer_ha = [pd.Timedelta(seconds=x) if notna(x) else np.nan for x in df.timer_ha]
+            if as_time in ['dt']:
+                df.time = [pd.to_datetime(' '.join(d.strftime('%Y-%m-%d'), str(td)[-8:])) for d,td in zip(df.vod_date, df.time)]
+                df.timer = [pd.to_datetime(' '.join(d.strftime('%Y-%m-%d'), str(td)[-8:])) for d,td in zip(df.vod_date, df.timer)]
+                df.time_adj = [pd.to_datetime(' '.join(d.strftime('%Y-%m-%d'), str(td)[-8:])) if notna(x) else np.nan for d,td in zip(df.vod_date, df.time_adj)]
+                df.timer_adj = [pd.to_datetime(' '.join(d.strftime('%Y-%m-%d'), str(td)[-8:])) if notna(x) else np.nan for d,td in zip(df.vod_date, df.timer_adj)]
+                df.time_ha = [pd.to_datetime(' '.join(d.strftime('%Y-%m-%d'), str(td)[-8:])) if notna(x) else np.nan for d,td in zip(df.vod_date, df.time_ha)]
+                df.timer_ha = [pd.to_datetime(' '.join(d.strftime('%Y-%m-%d'), str(td)[-8:])) if notna(x) else np.nan for d,td in zip(df.vod_date, df.timer_ha)]
         except Exception as e:
             raise VodCrawlerException(f'unable to retrieve data') from e
+        df = df[cols] if cols else df
+        return df
+
+    def get_rawdata(self) -> pd.DataFrame:
+        df = self.raw_df.rename(columns={'label': 'point_label', 'label_change': 'point_label_update'})
+        df = df.set_index('vod_name').join(self.get_vod_names())
+        df = df.set_index('point_name').join(self.get_tracker_points())
+        df = df.set_index('point_label').join(self.get_tracker_labels())
+        df = df.set_index('point_label_update').join(self.get_tracker_labels(), rsuffix='_update')
+        df = df.sort_values(['vod_id', 'tracker_name', 'point_name', 'time']).reset_index(drop=True)
+        df['is_stutter'] = self.get_tag_stutter(df)
+        df.point_label = df.point_label.str.split('-', expand=True)[0]
+        df.point_label_update = df.point_label_update.str.split('-', expand=True)[0]
+        return df
+    
+    def get_tag_stutter(self, df: pd.DataFrame) -> pd.DataFrame:
+        # TODO add event count per point_name as removal criterion (ALTTP Rando #19.05.2024)
+        df_m = df[['time', 'vod_id', 'point_name', 'point_label', 'point_label_update']]
+        df_m.point_label = df_m.point_label.str.split('-', expand=True)[0]
+        df_m.point_label_update = df_m.point_label_update.str.split('-', expand=True)[0]
+        for c in df_m.columns:
+            df_m[c+'_pre'] = df_m[c].shift(1)
+            df_m[c+'_post'] = df_m[c].shift(-1)
+        # df_m = df_m.dropna()
+        df_m['no_change'] = df_m.point_label == df_m['point_label_update']
+        df_m['time_pre'] = abs(df_m.time - df_m['time_pre']) <= self.stutter_sec
+        df_m['time_post'] = abs(df_m.time - df_m['time_post']) <= self.stutter_sec
+        df_m['vod_id_pre'] = df_m.vod_id == df_m['vod_id_pre']
+        df_m['vod_id_post'] = df_m.vod_id == df_m['vod_id_post']
+        df_m['point_name_pre'] = df_m.point_name == df_m['point_name_pre']
+        df_m['point_name_post'] = df_m.point_name == df_m['point_name_post']
+        df_m['close_to_pre'] = df_m[['time_pre', 'vod_id_pre', 'point_name_pre']].all(axis=1)
+        df_m['close_to_post'] = df_m[['time_post', 'vod_id_post', 'point_name_post']].all(axis=1)
+        df_m['is_time_paired'] = df_m[['close_to_pre', 'close_to_post']].any(axis=1)
+        df_m.point_label = df_m.point_label + ' - ' + df_m.point_label_update
+        df_m.point_label_pre = (df_m.point_label_update_pre + ' - ' + df_m.point_label_pre) == df_m.point_label
+        df_m.point_label_post = (df_m.point_label_update_post + ' - ' + df_m.point_label_post) == df_m.point_label
+        df_m['point_label_pre'] = df_m[['point_label_pre', 'vod_id_pre', 'point_name_pre']].all(axis=1)
+        df_m['point_label_post'] = df_m[['point_label_post', 'vod_id_post', 'point_name_post']].all(axis=1)
+        df_m['is_label_paired'] = df_m[['point_label_pre', 'point_label_post']].any(axis=1)
+        # df_m = df_m[df_m.point_name.isin(['11|SWO', '12|SLD'])][['time', 'is_time_paired', 'vod_id', 'point_name', 'point_label', 'is_label_paired', 'point_label_pre', 'point_label_post']]  # .drop(columns=['time_pre', 'time_post', 'vod_id_pre', 'vod_id_post', 'point_name_pre', 'point_name_post', 'close_to_pre', 'close_to_post'])
+        df_m = df_m[['time', 'is_time_paired', 'vod_id', 'point_name', 'point_label', 'is_label_paired', 'point_label_pre', 'point_label_post', 'no_change']]  # .drop(columns=['time_pre', 'time_post', 'vod_id_pre', 'vod_id_post', 'point_name_pre', 'point_name_post', 'close_to_pre', 'close_to_post'])
+        df_m['is_stutter'] = df_m[['is_time_paired', 'point_label_pre']].all(axis=1)
+        df_m['is_stutter'] = df_m[['is_stutter', 'no_change']].any(axis=1)
+        # df_m['is_stutter'] = ~df_m.is_paired
+
+        return list(df_m['is_stutter'])
+
+    def get_vod_names(self) -> pd.DataFrame:
+        df = self.vod_names.rename(columns={'label': 'vod_name'})
+        df = df.reset_index().rename(columns={'index': 'vod_id'})
+        return df
+    
+    def get_tracker_points(self) -> pd.DataFrame:
+        df = self.tracker_points.rename(columns={'label': 'point_name'})
+        df['point_id'] = df.point_name.str.split('|', expand=True)[0]
+        df['point_tag'] = df.point_name.str.split('|', expand=True)[1]
+        df['tracker_id'] = df.tracker_name.str.split('|', expand=True)[0]
+        df['tracker_tag'] = df.tracker_name.str.split('|', expand=True)[1]
+        df = df[['point_name', 'point_id', 'point_tag', 'tracker_name', 'tracker_id', 'tracker_tag']]
+        return df
+
+    def get_tracker_labels(self) -> pd.DataFrame:
+        df = self.tracker_labels.rename(columns={'label': 'point_label'})
+        return df
+
+    def get_metadata(self, extended=False, gg_cols: list = ['race_start', 'entrant_name', 'entrant_place', 'entrant_finishtime', 'entrant_rank', 'race_mode_simple', 'race_group', 'race_tournament', 'race_category', ]) -> pd.DataFrame:
+        df = self.vod_metadata_df.set_index('vod_name')
+        if extended:
+            df = df.join(self.get_vod_names().set_index('vod_name'), rsuffix='_md').reset_index()
+            host_ids_lst = self.gg.hosts_df[self.gg.hosts_df.host_name.isin(list(set(df.host_name)))].host_id.to_list()
+            df_gg = self.gg.get_df(host_ids=host_ids_lst, cols=gg_cols, unique=True, host_rows_only=True).rename(columns={'entrant_name': 'host_name', 'race_start': 'vod_date'})
+            df_gg.vod_date = pd.to_datetime(df_gg.vod_date.dt.date)
+            df = df.set_index(['vod_date', 'host_name']).join(df_gg.set_index(['vod_date', 'host_name']), how='left').reset_index()
+            df = df.set_index('vod_name')
         return df
     
     def refresh_transforms(self) -> None:
@@ -366,27 +756,6 @@ class VodCrawler:
             return crawler
         except Exception as e:
             raise LoadError(f'unable to load crawler: {path=}') from e
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class RacetimeCrawler:
