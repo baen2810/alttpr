@@ -41,7 +41,7 @@
 from typing import Union, Optional, Tuple, Dict, List
 from pathlib import Path
 from tqdm import tqdm
-from alttpr.utils import pprint, pprintdesc
+from alttpr.utils import pprint, pprintdesc, chop_ms
 from alttpr.config_color_labels_default import COLOR_LABELS_MAP_TRACKERS, COLOR_LABELS_ITEM_TRACKER
 import os
 import numpy as np
@@ -129,7 +129,7 @@ class DunkaScanner:
             raise ValueError("Error: Could not open video.")
 
         # Get the video's frames per second (fps)
-        self.fps = int(cap.get(cv2.CAP_PROP_FPS) + 1)
+        self.fps = int(cap.get(cv2.CAP_PROP_FPS)+ 1)  #  
         if self.fps == 0:  # Handle cases where FPS might be zero or unavailable
             raise ValueError("Error: Could not get video FPS.")
 
@@ -189,7 +189,11 @@ class DunkaScanner:
 
         fps = int(cap.get(cv2.CAP_PROP_FPS) + 1)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        default_frame = int(pd.to_timedelta(default_time).total_seconds() * fps)
+        try:
+            default_frame = int(pd.to_timedelta(default_time).total_seconds() * fps)
+        except:
+            pprint(f'Could not convert to td: \'{default_time}\'. Defaulting to \'01:15:00\'')
+            default_frame = int(pd.to_timedelta('01:15:00').total_seconds() * fps)
         current_frame = default_frame
 
         jump_to_frame = min(int(1.5 * 3600 * fps), total_frames - 2*fps)  # Jump to 01:30:00 or end of video
@@ -200,7 +204,7 @@ class DunkaScanner:
             cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
             ret, frame = cap.read()
             while not ret:
-                pprint('Error displaying frame. Resetting by 00:0:01.')
+                pprint('Error displaying frame. Resetting by 00:00:01.')
                 current_frame = current_frame-fps
                 cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
                 ret, frame = cap.read()
@@ -260,7 +264,7 @@ class DunkaScanner:
         cap.release()
         cv2.destroyAllWindows()
 
-        selected_time = pd.to_timedelta(current_frame / fps, unit='s')
+        selected_time = chop_ms(pd.to_timedelta(current_frame / fps, unit='s'))
 
         pprint(f'{title}: {selected_time.components.hours:02}:{selected_time.components.minutes:02}:{selected_time.components.seconds:02}')
         return selected_time
@@ -692,7 +696,7 @@ class DunkaScanner:
         - save_nth_frame: Save every nth frame (default is 10).
         """
         # Check and clear output directory
-        save_nth_frame = save_nth_frame * self.fps
+        # save_nth_frame = save_nth_frame * self.fps
         video_name = self.input_video_path.stem  # Get the video file name without extension
         frames_output_path = self.output_path / video_name / 'frames'
         self._check_and_delete_existing_output(frames_output_path)
@@ -708,8 +712,10 @@ class DunkaScanner:
         interval, frame_indices = self._calculate_frame_extraction_intervals()
 
         data = []
-
+        i = 0
         for frame_index in tqdm(frame_indices, desc=pprintdesc('Extracting frames')):
+            # if i == 207:
+            #     print('now')
             # Set the position of the next frame to read
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             ret, frame = cap.read()
@@ -720,6 +726,7 @@ class DunkaScanner:
 
             # Calculate the timestamp for the frame
             frame_time, frame_timestamp = self._calculate_frame_timestamp(frame_index)
+            frame_time = chop_ms(frame_time)
 
             # Extract RGB values for points before overlaying
             frame_data = self._extract_rgb_values(frame, frame_time)
@@ -730,18 +737,19 @@ class DunkaScanner:
             # Draw the tables with RGB values
             
             self._draw_table(frame, frame_data, table_position,
-                             font_scale=0.25, line_height=8)
+                             font_scale=0.20, line_height=8)
 
             # Append data for dataframe
             data.extend(frame_data)
 
             # Construct the output file path
             frame_filename = frames_output_path / f"{frame_timestamp}.jpg"
-            if len(data) % save_nth_frame == 0:
+            if i % save_nth_frame == 0:
                 cv2.imwrite(str(frame_filename), frame)
 
             # Add the filename to the list of extracted frames
             self.frames.append(str(frame_filename))
+            i+= 1
 
         # Release the video capture object
         cap.release()
@@ -766,7 +774,11 @@ class DunkaScanner:
             interval = 1
         start_frame = int(self.start_ts.total_seconds() * self.fps)
         end_frame = int(self.end_ts.total_seconds() * self.fps)
-        frame_indices = range(start_frame, min(end_frame + 1, self.total_frames), interval)
+        end_frame = min(end_frame + 1, self.total_frames)
+        frame_indices = range(start_frame, end_frame, interval)
+        frame_indices = list(frame_indices)
+        if frame_indices[-1] != end_frame:
+            frame_indices[-1] = end_frame
         return interval, frame_indices
 
     def _calculate_frame_timestamp(self, frame_index: int) -> Tuple[pd.Timedelta, str]:
@@ -792,9 +804,13 @@ class DunkaScanner:
                     B, G, R = frame[point_y, point_x].astype(float)
                     B, G, R = np.clip([B, G, R], 0, 255)  # Ensure values are within [0, 255]
                     color_label = self._classify_RGB_into_color_labels(point_name, R, G, B, color_labels)
+                    # if point_name == '72|THP' and frame_time >= pd.Timedelta('00:04:00'):
+                    #     pass
                     data.append({
-                        'frame': frame_time,
+                        'frame': chop_ms(frame_time),
                         'point_name': point_name.ljust(7),
+                        'point_x': point_x,
+                        'point_y': point_y,
                         'R': str(R).zfill(3),
                         'G': str(G).zfill(3),
                         'B': str(B).zfill(3),
@@ -979,6 +995,8 @@ class DunkaScanner:
         export_dict_to_txt('LIGHTWORLD_MAP_POINTS', self.lightworld_map_tracker_points)
         export_dict_to_txt('DARKWORLD_MAP_POINTS', self.darkworld_map_tracker_points)
         export_dict_to_txt('START_END_TIMESTAMP', {'START_TS': '\''+ str(self.start_ts)[-8:] + '\'', 'END_TS': '\'' + str(self.end_ts)[-8:] + '\''}, fn="config_timestamps.py", delete=True)
+        export_tuple_to_txt('OFFSET_TIMEDELTA', '\'' + str(self.offset_ts)[-8:] + '\'', fn="config_offset.py", delete=True)
+        export_tuple_to_txt('NOTES', '\'' + self.notes + '\'', fn="config_notes.py", delete=True)
 
         pprint('Exporting raw data')
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -1017,5 +1035,5 @@ class DunkaScanner:
         """
         with open(file_path, 'rb') as file:
             scanner = pickle.load(file)
-        pprint(f"Scanner object loaded from {file_path}")
+        pprint(f"Scanner object loaded from {file_path}")  # TODO include verbosity
         return scanner
