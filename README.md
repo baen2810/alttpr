@@ -1,6 +1,6 @@
 # ALttPR
 
-*Current Release version: 00.02.04 (2024-10-19)* (check releases below)
+*Current Release version: 00.02.05 (2025-01-11)* (check releases below)
 
 ALttPR is a collection of tools to build game analytics pipelines for 'A Link to the Past Randomizer' games.
 ALttPR is pretty cool. If you want to learn more about Randomizers and Romhacking, checkout  (https://alttpr.com/en).
@@ -148,6 +148,7 @@ Various tests will be executed. Check console output for errors.
 
 | Version   | Date       | Changes                                                   |
 |-----------|------------|-----------------------------------------------------------|
+| v00.02.05 | 2025-01-11 | - Add race url black- and whitelists                      |
 | v00.02.04 | 2024-10-19 | - Add vod-crawler                                         |
 | v00.02.03 | 2024-08-27 | - Minor bugfixes for stats                                |
 | v00.02.02 | 2024-08-25 | - Bugfixes for dotenv2dict attribute race_n_forfeits      |
