@@ -29,6 +29,7 @@ ALTTPR_OUTPUT_FOLDER_PRIVATE = Path(os.getenv('ALTTPR_OUTPUT_FOLDER_PRIVATE_PATH
 ALTTPR_OUTPUT_FOLDER_PUBLIC = Path(os.getenv('ALTTPR_OUTPUT_FOLDER_PUBLIC_PATH'))
 ALTTPR_CRAWLER_FILE = Path(os.getenv('ALTTPR_CRAWLER_FILE_PATH'))
 ALTTPR_STATS_TEMPLATE_FILE = Path(os.getenv('ALTTPR_STATS_TEMPLATE_FILE_PATH'))
+ALTTPR_PARSE_TEMPLATE_FILE = Path(os.getenv('ALTTPR_PARSE_TEMPLATE_FILE_PATH'))
 ALTTPR_OUTPUT_DFS_PUBLIC = dotenv2lst('ALTTPR_OUTPUT_DFS_PUBLIC_LST')
 ALTTPR_RUNTIMES = dotenv2lst('ALTTPR_RUNTIMES_LST')
 ALTTPR_HOSTS = dotenv2dict('ALTTPR_HOSTS_DICT')
@@ -57,6 +58,7 @@ def main():
         # n_pages = None
     gg.set_host_ids(host_ids)
     gg.set_stats_template_path(ALTTPR_STATS_TEMPLATE_FILE)
+    gg.set_parse_template_path(ALTTPR_PARSE_TEMPLATE_FILE)
     gg.set_metrics_dicts(
         windows_dict=ALTTPR_WINDOWS,
         drop_forfeits_dict=ALTTPR_DROP_FORFEITS,

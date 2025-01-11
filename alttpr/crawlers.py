@@ -1212,12 +1212,22 @@ class RacetimeCrawler:
         pprint(f'Collected {len(self.race_ids)} race ids from {i+1} hosts:')
     
     def _get_races_data(self):
+        race_url_blacklist = list(pd.read_excel(self.parse_template_path, sheet_name=['race-blacklist'])['race-blacklist']['race_href'])
+        race_url_whitelist = list(pd.read_excel(self.parse_template_path, sheet_name=['race-whitelist'])['race-whitelist']['race_href'])
         race_ids_to_crawl = [i for i in self.race_ids if i not in self._list_ids_in_races_df()]  # /alttpr/banzai-redboom-2002
+        race_ids_to_crawl = list(sorted(set(race_ids_to_crawl + race_url_whitelist)))
         race_ids_already_crawled = [i for i in self.race_ids if i in self._list_ids_in_races_df()]
         pprint(f'{len(race_ids_already_crawled)} races were already parsed.')
         if len(race_ids_to_crawl) > 0:
             pprint(f'Crawling {len(race_ids_to_crawl)} new races (max 30 shown): {race_ids_to_crawl[:30]}')
-            new_races_df = pd.concat([self._get_race_data(r) for r in tqdm(race_ids_to_crawl, desc=pprintdesc('Crawling races'))], ignore_index=True)
+            race_data_lst = []
+            for r in tqdm(race_ids_to_crawl, desc=pprintdesc('Crawling races')):
+                if r in race_url_blacklist:
+                    warn_str = f"WARNING! Race-URL {r} is blacklisted. Skipped. Check {self.parse_template_path}"
+                    tqdm.write(warn_str)
+                else:
+                    race_data_lst += [self._get_race_data(r)]
+            new_races_df = pd.concat(race_data_lst, ignore_index=True)
             new_races_df.race_start = new_races_df.race_start.dt.tz_localize(None)  # TODO messy. store raw data separately from transformed data
             self.races_df = pd.concat([self.races_df, new_races_df], ignore_index=True).sort_values(['race_start', 'entrant_place'], ascending=[False, True]).reset_index(drop=True)
         else:
@@ -1247,19 +1257,11 @@ class RacetimeCrawler:
 
     def _get_race_data(self, url: str) -> pd.DataFrame:
         try:
+            # if url == '/smr/fearless-threemuskateers-0765':
+            #     print('now')
             dfs = pd.read_excel(self.parse_template_path, sheet_name=['racetime-user-class-options'])
             race_url = self.base_url + url
             response = self._scrape(race_url)
-            # raise ScrapeError('This is a dummy error.')
-            # class_options = [
-            #     {"class": "user-pop inline"},
-            #     {"class": "user-pop inline supporter moderator"},
-            #     {"class": "user-pop inline supporter"},
-            #     {"class": "user-pop inline moderator"}, 
-            #     {"class": "user-pop inline staff supporter moderator"},
-            #     {"class": "user-pop inline staff supporter"},
-            #     {"class": "user-pop inline staff moderator"},    
-            # ]
             class_options = [{"class": c} for c in dfs['racetime-user-class-options'].class_options]
             rsoup = BeautifulSoup(response.content, "html.parser")
             rsoup_info = rsoup.find('div', {"class": "race-intro"})
@@ -1286,7 +1288,10 @@ class RacetimeCrawler:
                     except (AttributeError, TypeError, KeyError):
                         continue
                 if href_user is None:
-                    raise ParseError(f"Could not parse href_user for entrant \'{e}\' in race \'{race_url}\'.")
+                    if e.find('span', {"class": "name"}).text == '(deleted user)':
+                        href_user = '/user/deleteduser/deleteduser'
+                    else:
+                        raise ParseError(f"Could not parse href_user for entrant \'{e}\' in race \'{race_url}\'.")
                 entrant_finishtime = e.find('time', {"class": "finish-time"}).text
                 df = pd.concat([df, pd.DataFrame({
                     'race_id': [url],
@@ -1306,7 +1311,7 @@ class RacetimeCrawler:
             self.last_updated = pd.Timestamp.now()
             return df
         except Exception as e:
-            raise CrawlError(f'Failed to execute _get_race_data() on: "{url}"') from e
+            raise CrawlError(f'Failed to execute _get_race_data() for entrant \'{e}\' on: "{race_url}"') from e
 
     def _parse_race_info(self):
         try:
